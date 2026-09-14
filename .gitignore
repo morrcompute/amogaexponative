@@ -18,7 +18,6 @@ pnpm-debug.log*
 dist/
 web-build/
 .eas/
-eas.json
 
 # Certificates and keys
 *.jks
