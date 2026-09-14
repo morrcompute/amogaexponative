@@ -1,0 +1,59 @@
+name: Build Mobile Preview (APK & iOS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Target Platform'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - android
+          - ios
+      profile:
+        description: 'EAS Build Profile (preview = APK & iOS Simulator)'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - preview:device
+          - production
+      wait_for_build:
+        description: 'Wait for build to complete in GitHub Actions'
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  build:
+    name: EAS Build (${{ github.event.inputs.platform }} - ${{ github.event.inputs.profile }})
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Expo & EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run EAS Build
+        run: |
+          if [ "${{ github.event.inputs.wait_for_build }}" = "true" ]; then
+            eas build --platform ${{ github.event.inputs.platform }} --profile ${{ github.event.inputs.profile }} --non-interactive
+          else
+            eas build --platform ${{ github.event.inputs.platform }} --profile ${{ github.event.inputs.profile }} --non-interactive --no-wait
+          fi
