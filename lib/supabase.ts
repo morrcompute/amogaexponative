@@ -19,8 +19,12 @@ if (!globalThis.crypto.subtle) {
   };
 }
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '';
+const supabaseUrl =
+  process.env.EXPO_PUBLIC_SUPABASE_URL ||
+  'https://nvxcqbisyeldjceouggb.supabase.co';
+const supabaseKey =
+  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  'sb_publishable_f7pb9k7U2jT9GgyO4GC2rg_guymXYhK';
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
   auth: {

@@ -27,7 +27,9 @@ export default function AuthLayout() {
       }}
     >
       <Stack.Screen name='sign-in' />
+      <Stack.Screen name='sign_in' />
       <Stack.Screen name='sign-up' />
+      <Stack.Screen name='sign_up' />
       <Stack.Screen name='magic-link' />
       <Stack.Screen name='verify-otp' />
       <Stack.Screen name='forgot-password' />
