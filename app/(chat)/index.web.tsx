@@ -35,8 +35,10 @@ import {
   ComingSoonView,
   ThemeSettingsDrawer,
   PreferencesDrawer,
+  AppSettingsView,
   FullPageMap,
   CalendarAppView,
+  EmailAppView,
   DEFAULT_MAP_MARKERS,
   DEFAULT_NAV_ITEMS,
   app_menu_json,
@@ -87,6 +89,7 @@ export default function ChatWebScreen() {
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
   const [isMyProfileOpen, setIsMyProfileOpen] = useState(false);
   const [isMyMapOpen, setIsMyMapOpen] = useState(false);
+  const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false);
   const modeContext = useModeContext();
   const { colorTheme, setColorTheme, resetColorTheme, colorThemes } = useColorTheme();
 
@@ -493,8 +496,8 @@ export default function ChatWebScreen() {
     }
   }, [conversations, activeConversationId, setActiveConversationId, isMobileOrTablet]);
 
-  const showSidebar = !isMobileOrTablet || (!activeConversationId && !isPreferencesOpen && !isThemeSettingsOpen && !isMyProfileOpen && !isMyMapOpen);
-  const showDetailPane = !isMobileOrTablet || !!activeConversationId || isPreferencesOpen || isThemeSettingsOpen || isMyProfileOpen || isMyMapOpen;
+  const showSidebar = !isMobileOrTablet || (!activeConversationId && !isPreferencesOpen && !isThemeSettingsOpen && !isMyProfileOpen && !isMyMapOpen && !isAppSettingsOpen);
+  const showDetailPane = !isMobileOrTablet || !!activeConversationId || isPreferencesOpen || isThemeSettingsOpen || isMyProfileOpen || isMyMapOpen || isAppSettingsOpen;
 
   return (
     <View style={[styles.rootContainer, { backgroundColor: colors.background }]}>
@@ -510,31 +513,50 @@ export default function ChatWebScreen() {
             setIsPreferencesOpen(false);
             setIsThemeSettingsOpen(false);
             setIsMyMapOpen(false);
+            setIsAppSettingsOpen(false);
             setIsMyProfileOpen(true);
           }}
           onMapPress={() => {
             setIsPreferencesOpen(false);
             setIsThemeSettingsOpen(false);
             setIsMyProfileOpen(false);
+            setIsAppSettingsOpen(false);
             setIsMyMapOpen(true);
           }}
           onThemePress={() => {
             setIsMyProfileOpen(false);
             setIsPreferencesOpen(false);
             setIsMyMapOpen(false);
+            setIsAppSettingsOpen(false);
             setIsThemeSettingsOpen(true);
           }}
           onPreferencesPress={() => {
             setIsMyProfileOpen(false);
             setIsThemeSettingsOpen(false);
             setIsMyMapOpen(false);
+            setIsAppSettingsOpen(false);
             setIsPreferencesOpen(true);
           }}
           onPreferencePress={() => {
             setIsMyProfileOpen(false);
             setIsThemeSettingsOpen(false);
             setIsMyMapOpen(false);
+            setIsAppSettingsOpen(false);
             setIsPreferencesOpen(true);
+          }}
+          onSettingsPress={() => {
+            setIsMyProfileOpen(false);
+            setIsThemeSettingsOpen(false);
+            setIsMyMapOpen(false);
+            setIsPreferencesOpen(false);
+            setIsAppSettingsOpen(true);
+          }}
+          onAppSettingsPress={() => {
+            setIsMyProfileOpen(false);
+            setIsThemeSettingsOpen(false);
+            setIsMyMapOpen(false);
+            setIsPreferencesOpen(false);
+            setIsAppSettingsOpen(true);
           }}
           onSignOut={signOut}
           onLogoPress={() => setMainNavId('chat')}
@@ -561,6 +583,7 @@ export default function ChatWebScreen() {
             setIsPreferencesOpen(false);
             setIsThemeSettingsOpen(false);
             setIsMyMapOpen(false);
+            setIsAppSettingsOpen(false);
             setIsMyProfileOpen(true);
             setIsDrawerOpen(false);
           }}
@@ -568,6 +591,7 @@ export default function ChatWebScreen() {
             setIsPreferencesOpen(false);
             setIsThemeSettingsOpen(false);
             setIsMyProfileOpen(false);
+            setIsAppSettingsOpen(false);
             setIsMyMapOpen(true);
             setIsDrawerOpen(false);
           }}
@@ -575,6 +599,7 @@ export default function ChatWebScreen() {
             setIsMyProfileOpen(false);
             setIsPreferencesOpen(false);
             setIsMyMapOpen(false);
+            setIsAppSettingsOpen(false);
             setIsThemeSettingsOpen(true);
             setIsDrawerOpen(false);
           }}
@@ -582,6 +607,7 @@ export default function ChatWebScreen() {
             setIsMyProfileOpen(false);
             setIsThemeSettingsOpen(false);
             setIsMyMapOpen(false);
+            setIsAppSettingsOpen(false);
             setIsPreferencesOpen(true);
             setIsDrawerOpen(false);
           }}
@@ -589,7 +615,24 @@ export default function ChatWebScreen() {
             setIsMyProfileOpen(false);
             setIsThemeSettingsOpen(false);
             setIsMyMapOpen(false);
+            setIsAppSettingsOpen(false);
             setIsPreferencesOpen(true);
+            setIsDrawerOpen(false);
+          }}
+          onSettingsPress={() => {
+            setIsMyProfileOpen(false);
+            setIsThemeSettingsOpen(false);
+            setIsMyMapOpen(false);
+            setIsPreferencesOpen(false);
+            setIsAppSettingsOpen(true);
+            setIsDrawerOpen(false);
+          }}
+          onAppSettingsPress={() => {
+            setIsMyProfileOpen(false);
+            setIsThemeSettingsOpen(false);
+            setIsMyMapOpen(false);
+            setIsPreferencesOpen(false);
+            setIsAppSettingsOpen(true);
             setIsDrawerOpen(false);
           }}
           onSignOut={signOut}
@@ -846,6 +889,11 @@ export default function ChatWebScreen() {
                     />
                   </View>
                 </View>
+              ) : isAppSettingsOpen ? (
+                <AppSettingsView
+                  onClose={() => setIsAppSettingsOpen(false)}
+                  title="App Settings"
+                />
               ) : isMyProfileOpen ? (
                 <ContactInfoView
                   conversation={myProfileConversation}
@@ -1250,6 +1298,146 @@ export default function ChatWebScreen() {
                         style={{
                           fontSize: 16,
                           fontWeight: '700',
+                          color: colors.foreground,
+                          fontFamily: 'Open Sans',
+                        }}
+                      >
+                        My Map
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => setIsMyMapOpen(false)}
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 17,
+                        backgroundColor: isDark ? '#27272a' : '#f1f5f9',
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Close My Map"
+                    >
+                      <X size={16} color={colors.mutedForeground} strokeWidth={2} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Full-Length Map */}
+                  <View style={{ flex: 1, width: '100%', height: '100%', overflow: 'hidden' }}>
+                    <FullPageMap
+                      markers={DEFAULT_MAP_MARKERS}
+                      defaultCenter={[23.2599, 77.4126]}
+                      defaultZoom={4}
+                      height="100%"
+                    />
+                  </View>
+                </View>
+              ) : isMyProfileOpen ? (
+                <ContactInfoView
+                  conversation={myProfileConversation}
+                  messages={messages}
+                  onClose={() => setIsMyProfileOpen(false)}
+                />
+              ) : undefined
+            }
+          />
+        </View>
+      ) : mainNavId === 'email' || mainNavId === 'mail' ? (
+        /* ──────────────── Email & Messages App View ──────────────── */
+        <View style={{ flex: 1, height: '100%', width: '100%', display: 'flex' as any, flexDirection: 'column' }}>
+          {isMobileOrTablet && (
+            <View
+              style={[
+                styles.userTopBar,
+                { borderBottomColor: colors.border },
+              ]}
+            >
+              <View style={styles.userRow}>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setIsDrawerOpen(true)}
+                  style={[
+                    styles.mobileLogoBadge,
+                    { backgroundColor: colors.primary, shadowColor: colors.primary },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open Navigation Menu"
+                >
+                  <Command size={18} color="#ffffff" strokeWidth={2.4} />
+                </TouchableOpacity>
+                <Text
+                  style={[styles.topBarTitle, { color: colors.foreground, fontSize: 16, fontWeight: '600', fontFamily: 'Open Sans' }]}
+                >
+                  Email
+                </Text>
+              </View>
+            </View>
+          )}
+
+          <EmailAppView
+            initialTab="Inbox"
+            onOpenDrawer={() => setIsDrawerOpen(true)}
+            rightOverlayView={
+              isAppSettingsOpen ? (
+                <AppSettingsView
+                  onClose={() => setIsAppSettingsOpen(false)}
+                  title="App Settings"
+                />
+              ) : isPreferencesOpen ? (
+                <PreferencesView
+                  onClose={() => setIsPreferencesOpen(false)}
+                  primaryColor={colors.primary}
+                />
+              ) : isThemeSettingsOpen ? (
+                <ThemeSettingsView
+                  onClose={() => setIsThemeSettingsOpen(false)}
+                  appearanceMode={modeContext?.mode || 'system'}
+                  onModeChange={(m) => modeContext?.setMode(m)}
+                  currentColorTheme={colorTheme}
+                  onColorThemeChange={setColorTheme}
+                  onResetTheme={() => {
+                    modeContext?.setMode('light');
+                    resetColorTheme();
+                  }}
+                  availableThemes={colorThemes}
+                />
+              ) : isMyMapOpen ? (
+                <View style={{ flex: 1, width: '100%', height: '100%', backgroundColor: colors.background, display: 'flex', flexDirection: 'column' }}>
+                  {/* Top Header with title and cross on right */}
+                  <View
+                    style={{
+                      height: 56,
+                      paddingHorizontal: 16,
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.border,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: colors.card || colors.background,
+                      zIndex: 10,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <View
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 8,
+                          backgroundColor: isDark ? '#1e3a8a' : '#dbeafe',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <MapPin size={17} color="#2563eb" strokeWidth={2.2} />
+                      </View>
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          fontWeight: '600',
                           color: colors.foreground,
                           fontFamily: 'Open Sans',
                         }}

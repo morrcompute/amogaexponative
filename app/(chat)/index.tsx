@@ -43,8 +43,10 @@ import {
   ThemeSettingsDrawer,
   PreferencesDrawer,
   PreferencesView,
+  AppSettingsView,
   FullPageMap,
   CalendarAppView,
+  EmailAppView,
   DEFAULT_MAP_MARKERS,
   DEFAULT_DRAWER_ITEMS,
   app_menu_json,
@@ -62,6 +64,7 @@ export default function MobileChatScreen() {
   const { user, profile, signOut } = useAuth();
   const toast = useToast();
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+  const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false);
 
   const {
     conversations,
@@ -1106,6 +1109,30 @@ export default function MobileChatScreen() {
 
           <CalendarAppView initialTab="today" onOpenDrawer={() => setIsDrawerOpen(true)} />
         </View>
+      ) : activeMenuId === 'email' || activeMenuId === 'mail' ? (
+        /* ──────────────── Email & Messages View ──────────────── */
+        <View style={{ flex: 1, backgroundColor: colors.background, paddingBottom: insets.bottom }}>
+          {/* Top Bar with Logo Drawer Button and Clean Title */}
+          <View style={[styles.userTopBar, { borderBottomColor: isDark ? colors.border : '#f1f5f9' }]}>
+            <View style={styles.userBarLeft}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setIsDrawerOpen(true)}
+                style={[styles.mobileLogoBadge, { backgroundColor: colors.primary }]}
+                accessibilityRole="button"
+                accessibilityLabel="Open Navigation Menu"
+              >
+                <Command size={18} color="#ffffff" strokeWidth={2.4} />
+              </TouchableOpacity>
+
+              <Text style={[styles.topBarTitle, { color: colors.foreground, fontSize: 16, fontWeight: '600', fontFamily: 'Open Sans' }]}>
+                Email
+              </Text>
+            </View>
+          </View>
+
+          <EmailAppView initialTab="Inbox" onOpenDrawer={() => setIsDrawerOpen(true)} />
+        </View>
       ) : (
         /* ──────────────── Non-Chat Menu Items (Screenshot 1) ──────────────── */
         <View style={{ flex: 1, backgroundColor: colors.background, paddingBottom: insets.bottom }}>
@@ -1162,6 +1189,22 @@ export default function MobileChatScreen() {
         onThemePress={() => setIsThemeSettingsOpen(true)}
         onPreferencesPress={() => setIsPreferencesOpen(true)}
         onPreferencePress={() => setIsPreferencesOpen(true)}
+        onAppSettingsPress={() => {
+          setIsDrawerOpen(false);
+          setIsAppSettingsOpen(true);
+        }}
+        onAppSettingPress={() => {
+          setIsDrawerOpen(false);
+          setIsAppSettingsOpen(true);
+        }}
+        onSettingsPress={() => {
+          setIsDrawerOpen(false);
+          setIsAppSettingsOpen(true);
+        }}
+        onSettingPress={() => {
+          setIsDrawerOpen(false);
+          setIsAppSettingsOpen(true);
+        }}
         onSignOut={signOut}
         primaryColor={colors.primary}
       />
@@ -1242,6 +1285,21 @@ export default function MobileChatScreen() {
               height="100%"
             />
           </View>
+        </View>
+      </Modal>
+
+      {/* App Settings Modal (Environment & Integrations) */}
+      <Modal
+        visible={isAppSettingsOpen}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setIsAppSettingsOpen(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
+          <AppSettingsView
+            onClose={() => setIsAppSettingsOpen(false)}
+            title="App Settings"
+          />
         </View>
       </Modal>
 
