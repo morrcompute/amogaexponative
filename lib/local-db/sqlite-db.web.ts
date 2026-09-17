@@ -37,44 +37,24 @@ function createWebMockDb() {
       if (q.startsWith('INSERT INTO LOCAL_EMAILS')) {
         const list = getItem('emails');
         const record: any = {
-          id: params[0],
-          message_id: params[1],
-          in_reply_to: params[2],
-          thread_id: params[3],
-          account_id: params[4],
-          from_name: params[5],
-          from_email: params[6],
-          to_recipients: params[7],
-          cc_recipients: params[8],
-          bcc_recipients: params[9],
-          reply_to: params[10],
-          subject: params[11],
-          snippet: params[12],
-          body_text: params[13],
-          body_html: params[14],
-          attachments: params[15],
-          headers: params[16],
-          folder: params[17],
-          is_read: params[18],
-          is_flagged: params[19],
-          is_important: params[20],
-          is_starred: params[21],
-          is_archived: params[22],
-          is_deleted: params[23],
-          is_draft: params[24],
-          is_spam: params[25],
-          category: params[26],
-          badges: params[27],
-          labels: params[28],
-          date_sent: params[29],
-          date_received: params[30],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          email_id: list.length + 1,
+          email_uuid: params[0],
+          subject: params[6] || '(No Subject)',
+          sender_email: params[7],
+          sender_name: params[8],
+          body: params[14],
+          is_read: params[15] || 0,
+          is_starred: params[16] || 0,
+          folder_name: params[124] || 'INBOX',
+          received_datetime: params[69] || new Date().toISOString(),
+          created_datetime: new Date().toISOString(),
+          updated_datetime: new Date().toISOString(),
+          is_deleted: 0,
         };
-        const filtered = list.filter((e) => e.id !== record.id);
+        const filtered = list.filter((e) => e.email_uuid !== record.email_uuid);
         filtered.unshift(record);
         setItem('emails', filtered);
-        return { changes: 1, lastInsertRowId: 1 };
+        return { changes: 1, lastInsertRowId: record.email_id };
       }
 
       if (q.startsWith('INSERT INTO LOCAL_FILES')) {
@@ -98,8 +78,8 @@ function createWebMockDb() {
 
       if (q.startsWith('UPDATE LOCAL_EMAILS')) {
         const list = getItem('emails');
-        const id = params[params.length - 1];
-        const updated = list.map((e) => (e.id === id ? { ...e, ...params } : e));
+        const uuid = params[params.length - 1];
+        const updated = list.map((e) => (e.email_uuid === uuid ? { ...e, ...params } : e));
         setItem('emails', updated);
         return { changes: 1 };
       }
@@ -112,7 +92,7 @@ function createWebMockDb() {
         const list = getItem('emails');
         const folder = params[0] ? String(params[0]).toLowerCase() : null;
         if (folder) {
-          return list.filter((e) => (e.folder || '').toLowerCase() === folder && !e.is_deleted);
+          return list.filter((e) => (e.folder_name || '').toLowerCase() === folder && !e.is_deleted);
         }
         return list.filter((e) => !e.is_deleted);
       }
@@ -131,7 +111,7 @@ function createWebMockDb() {
       if (q.includes('LOCAL_EMAILS')) {
         const list = getItem('emails');
         const id = params[0];
-        return list.find((e) => e.id === id) || null;
+        return list.find((e) => e.email_id === id || e.email_uuid === id) || null;
       }
       if (q.includes('LOCAL_FILES')) {
         const list = getItem('files');

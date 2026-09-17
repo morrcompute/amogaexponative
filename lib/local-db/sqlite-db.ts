@@ -43,47 +43,171 @@ export async function getLocalDatabase() {
 }
 
 async function createTables(db: any) {
-  // 1. Create local_emails table
+  // 1. Create local_emails table (with all 150+ columns)
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS local_emails (
-      id TEXT PRIMARY KEY,
-      message_id TEXT,
-      in_reply_to TEXT,
-      thread_id TEXT,
-      account_id TEXT DEFAULT 'primary',
-      from_name TEXT,
-      from_email TEXT NOT NULL,
-      to_recipients TEXT NOT NULL DEFAULT '[]',
-      cc_recipients TEXT DEFAULT '[]',
-      bcc_recipients TEXT DEFAULT '[]',
-      reply_to TEXT,
+      email_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email_uuid TEXT UNIQUE,
+      status TEXT DEFAULT 'active',
+      description TEXT,
+      icon TEXT,
+      user_email_account_id TEXT,
+      email_folder_id INTEGER,
       subject TEXT DEFAULT '(No Subject)',
-      snippet TEXT,
-      body_text TEXT,
-      body_html TEXT,
-      attachments TEXT DEFAULT '[]',
-      headers TEXT DEFAULT '{}',
-      folder TEXT NOT NULL DEFAULT 'inbox',
-      is_read INTEGER NOT NULL DEFAULT 0,
-      is_flagged INTEGER NOT NULL DEFAULT 0,
-      is_important INTEGER NOT NULL DEFAULT 0,
-      is_starred INTEGER NOT NULL DEFAULT 0,
-      is_archived INTEGER NOT NULL DEFAULT 0,
-      is_deleted INTEGER NOT NULL DEFAULT 0,
-      is_draft INTEGER NOT NULL DEFAULT 0,
-      is_spam INTEGER NOT NULL DEFAULT 0,
-      category TEXT DEFAULT 'primary',
-      badges TEXT DEFAULT '[]',
-      labels TEXT DEFAULT '[]',
-      date_sent TEXT,
-      date_received TEXT,
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
+      sender_email TEXT,
+      sender_name TEXT,
+      full_name TEXT,
+      sender_mobile TEXT,
+      recipient_mobiles TEXT,
+      cc_emails TEXT,
+      bcc_emails TEXT,
+      body TEXT,
+      is_read INTEGER DEFAULT 0,
+      is_starred INTEGER DEFAULT 0,
+      is_important INTEGER DEFAULT 0,
+      is_draft INTEGER DEFAULT 0,
+      is_deleted INTEGER DEFAULT 0,
+      has_attachments INTEGER DEFAULT 0,
+      ref_email_id INTEGER,
+      ref_email TEXT,
+      for_email_id TEXT,
+      for_email TEXT,
+      ref_sequence_no TEXT,
+      for_sequence_no TEXT,
+      ref_subject TEXT,
+      for_subject TEXT,
+      from_business_number TEXT,
+      from_business_name TEXT,
+      to_business_number TEXT,
+      to_business_name TEXT,
+      for_business_number TEXT,
+      for_business_name TEXT,
+      redirection_icon TEXT,
+      redirection_url TEXT,
+      ref_field_1 TEXT,
+      ref_field_2 TEXT,
+      user_note TEXT,
+      replied_to_email_id TEXT,
+      related_to_email_id TEXT,
+      forwarded_from_email_id TEXT,
+      seen_by_users TEXT,
+      reactions TEXT,
+      sender_display_name TEXT,
+      attachment_url TEXT,
+      attachment_name TEXT,
+      email_opened TEXT,
+      email_open_datetime TEXT,
+      email_open_geo TEXT,
+      custom_one TEXT,
+      custom_two TEXT,
+      custom_three TEXT,
+      meta_fields TEXT,
+      remarks TEXT,
+      store_meta TEXT,
+      workflow_meta TEXT,
+      share_url TEXT,
+      share_status TEXT,
+      business_name TEXT,
+      business_number TEXT,
+      ref_business TEXT,
+      ref_business_number TEXT,
+      ref_user TEXT,
+      ref_appname TEXT,
+      ref_datetime TEXT,
+      social_login_used TEXT,
+      created_user TEXT,
+      created_user_id TEXT,
+      received_datetime TEXT,
+      created_datetime TEXT DEFAULT (datetime('now')),
+      updated_datetime TEXT DEFAULT (datetime('now')),
+      app_name TEXT,
+      is_sync INTEGER DEFAULT 0,
+      ccusers_json TEXT DEFAULT '[]',
+      bccusers_json TEXT DEFAULT '[]',
+      from_email TEXT,
+      to_email TEXT,
+      from_user_name TEXT,
+      to_user_name TEXT,
+      from_mobile TEXT,
+      to_mobile TEXT,
+      from_user_uuid TEXT,
+      to_user_uuid TEXT,
+      from_fullname TEXT,
+      to_fullname TEXT,
+      body_rich_text_json TEXT DEFAULT '{}',
+      email_files_json TEXT DEFAULT '[]',
+      email_content_json TEXT DEFAULT '{}',
+      is_archive INTEGER DEFAULT 0,
+      progress_status TEXT,
+      email_use_timeline TEXT DEFAULT '[]',
+      message_group TEXT,
+      message_type TEXT,
+      message_category TEXT,
+      email_sequence_json TEXT DEFAULT '[]',
+      is_like INTEGER DEFAULT 0,
+      is_dislike INTEGER DEFAULT 0,
+      is_flag INTEGER DEFAULT 0,
+      is_favourite INTEGER DEFAULT 0,
+      user_uuid TEXT,
+      created_user_uuid TEXT,
+      updated_user_uuid TEXT,
+      user_name TEXT,
+      user_email TEXT,
+      user_mobile TEXT,
+      from_user_email TEXT,
+      from_user_mobile TEXT,
+      to_user_email TEXT,
+      to_user_mobile TEXT,
+      business_uuid TEXT,
+      created_business_uuid TEXT,
+      updated_business_uuid TEXT,
+      for_business_uuid TEXT,
+      ref_business_uuid TEXT,
+      ref_business_name TEXT,
+      from_business_uuid TEXT,
+      from_business_email TEXT,
+      from_business_mobile TEXT,
+      to_business_uuid TEXT,
+      to_business_email TEXT,
+      to_business_mobile TEXT,
+      email_group TEXT,
+      user_id INTEGER,
+      email_connection_json TEXT DEFAULT '{}',
+      email_status_logs_json TEXT DEFAULT '[]',
+      recipient_emails TEXT DEFAULT '[]',
+      status_json TEXT DEFAULT '{}',
+      progress_json TEXT DEFAULT '{}',
+      progress_status_json TEXT DEFAULT '{}',
+      ref_email_uuid TEXT,
+      for_email_uuid TEXT,
+      email_thread_json TEXT DEFAULT '[]',
+      is_actionitem INTEGER DEFAULT 0,
+      is_pin INTEGER DEFAULT 0,
+      email_status TEXT DEFAULT 'active',
+      is_template INTEGER DEFAULT 0,
+      template_name TEXT,
+      folder_name TEXT DEFAULT 'INBOX',
+      is_open INTEGER DEFAULT 0,
+      sent_server_email_uuid TEXT,
+      inbox_server_email_uuid TEXT,
+      sent_imap_id INTEGER,
+      inbox_imap_id INTEGER,
+      sub_folder_name TEXT,
+      month_id INTEGER,
+      month_uuid TEXT,
+      month_name TEXT,
+      financial_year_uuid TEXT,
+      financial_id INTEGER,
+      financial_year TEXT,
+      period_uuid TEXT,
+      period_id INTEGER,
+      period_name TEXT
     );
 
-    CREATE INDEX IF NOT EXISTS idx_local_emails_folder ON local_emails(folder);
-    CREATE INDEX IF NOT EXISTS idx_local_emails_date ON local_emails(date_received DESC);
+    CREATE INDEX IF NOT EXISTS idx_local_emails_folder ON local_emails(folder_name);
+    CREATE INDEX IF NOT EXISTS idx_local_emails_date ON local_emails(received_datetime DESC);
     CREATE INDEX IF NOT EXISTS idx_local_emails_read ON local_emails(is_read);
+    CREATE INDEX IF NOT EXISTS idx_local_emails_uuid ON local_emails(email_uuid);
   `);
 
   // 2. Create local_files table (with all columns)
@@ -274,44 +398,24 @@ function createWebMockDb() {
       if (q.startsWith('INSERT INTO LOCAL_EMAILS')) {
         const list = getItem('emails');
         const record: any = {
-          id: params[0],
-          message_id: params[1],
-          in_reply_to: params[2],
-          thread_id: params[3],
-          account_id: params[4],
-          from_name: params[5],
-          from_email: params[6],
-          to_recipients: params[7],
-          cc_recipients: params[8],
-          bcc_recipients: params[9],
-          reply_to: params[10],
-          subject: params[11],
-          snippet: params[12],
-          body_text: params[13],
-          body_html: params[14],
-          attachments: params[15],
-          headers: params[16],
-          folder: params[17],
-          is_read: params[18],
-          is_flagged: params[19],
-          is_important: params[20],
-          is_starred: params[21],
-          is_archived: params[22],
-          is_deleted: params[23],
-          is_draft: params[24],
-          is_spam: params[25],
-          category: params[26],
-          badges: params[27],
-          labels: params[28],
-          date_sent: params[29],
-          date_received: params[30],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          email_id: list.length + 1,
+          email_uuid: params[0],
+          subject: params[6] || '(No Subject)',
+          sender_email: params[7],
+          sender_name: params[8],
+          body: params[14],
+          is_read: params[15] || 0,
+          is_starred: params[16] || 0,
+          folder_name: params[124] || 'INBOX',
+          received_datetime: params[69] || new Date().toISOString(),
+          created_datetime: new Date().toISOString(),
+          updated_datetime: new Date().toISOString(),
+          is_deleted: 0,
         };
-        const filtered = list.filter((e) => e.id !== record.id);
+        const filtered = list.filter((e) => e.email_uuid !== record.email_uuid);
         filtered.unshift(record);
         setItem('emails', filtered);
-        return { changes: 1, lastInsertRowId: 1 };
+        return { changes: 1, lastInsertRowId: record.email_id };
       }
 
       if (q.startsWith('INSERT INTO LOCAL_FILES')) {
@@ -335,8 +439,8 @@ function createWebMockDb() {
 
       if (q.startsWith('UPDATE LOCAL_EMAILS')) {
         const list = getItem('emails');
-        const id = params[params.length - 1];
-        const updated = list.map((e) => (e.id === id ? { ...e, ...params } : e));
+        const uuid = params[params.length - 1];
+        const updated = list.map((e) => (e.email_uuid === uuid ? { ...e, ...params } : e));
         setItem('emails', updated);
         return { changes: 1 };
       }
@@ -349,7 +453,7 @@ function createWebMockDb() {
         const list = getItem('emails');
         const folder = params[0] ? String(params[0]).toLowerCase() : null;
         if (folder) {
-          return list.filter((e) => (e.folder || '').toLowerCase() === folder && !e.is_deleted);
+          return list.filter((e) => (e.folder_name || '').toLowerCase() === folder && !e.is_deleted);
         }
         return list.filter((e) => !e.is_deleted);
       }
@@ -368,7 +472,7 @@ function createWebMockDb() {
       if (q.includes('LOCAL_EMAILS')) {
         const list = getItem('emails');
         const id = params[0];
-        return list.find((e) => e.id === id) || null;
+        return list.find((e) => e.email_id === id || e.email_uuid === id) || null;
       }
       if (q.includes('LOCAL_FILES')) {
         const list = getItem('files');
