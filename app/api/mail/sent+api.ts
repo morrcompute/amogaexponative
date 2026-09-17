@@ -6,7 +6,15 @@ export async function GET(request: Request) {
     const page = parseInt(url.searchParams.get('page') || '1', 10);
     const limit = parseInt(url.searchParams.get('limit') || '20', 10);
 
-    const result = await getSentEmails({ page, limit });
+    const configHeader = request.headers.get('x-mail-config');
+    let customConfig;
+    if (configHeader) {
+      try {
+        customConfig = JSON.parse(configHeader);
+      } catch (_) {}
+    }
+
+    const result = await getSentEmails({ page, limit, customConfig });
 
     return Response.json(result, {
       status: result.success ? 200 : 500,

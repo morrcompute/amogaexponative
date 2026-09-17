@@ -40,7 +40,7 @@
       ]
     },
     "web": {
-      "output": "single",
+      "output": "server",
       "favicon": "./assets/images/icon.png"
     },
     "plugins": [
