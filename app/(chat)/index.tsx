@@ -112,6 +112,11 @@ export default function MobileChatScreen() {
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [externalReplyMap, setExternalReplyMap] = useState<Record<string, any>>({});
+  const [isEmailDetailOrCompose, setIsEmailDetailOrCompose] = useState(false);
+
+  useEffect(() => {
+    setIsEmailDetailOrCompose(false);
+  }, [activeMenuId]);
 
   useEffect(() => {
     setShowContactInfo(false);
@@ -1111,27 +1116,43 @@ export default function MobileChatScreen() {
         </View>
       ) : activeMenuId === 'email' || activeMenuId === 'mail' ? (
         /* ──────────────── Email & Messages View ──────────────── */
-        <View style={{ flex: 1, backgroundColor: colors.background, paddingBottom: insets.bottom }}>
-          {/* Top Bar with Logo Drawer Button and Clean Title */}
-          <View style={[styles.userTopBar, { borderBottomColor: isDark ? colors.border : '#f1f5f9' }]}>
-            <View style={styles.userBarLeft}>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => setIsDrawerOpen(true)}
-                style={[styles.mobileLogoBadge, { backgroundColor: colors.primary }]}
-                accessibilityRole="button"
-                accessibilityLabel="Open Navigation Menu"
-              >
-                <Command size={18} color="#ffffff" strokeWidth={2.4} />
-              </TouchableOpacity>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: colors.background,
+            paddingBottom: insets.bottom,
+            paddingTop: isEmailDetailOrCompose ? insets.top : 0,
+            width: '100%',
+          }}
+        >
+          {/* Top Bar with Logo Drawer Button and Clean Title (hidden in detail or compose view) */}
+          {!isEmailDetailOrCompose && (
+            <View style={[styles.userTopBar, { borderBottomColor: isDark ? colors.border : '#f1f5f9' }]}>
+              <View style={styles.userBarLeft}>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setIsDrawerOpen(true)}
+                  style={[styles.mobileLogoBadge, { backgroundColor: colors.primary }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open Navigation Menu"
+                >
+                  <Command size={18} color="#ffffff" strokeWidth={2.4} />
+                </TouchableOpacity>
 
-              <Text style={[styles.topBarTitle, { color: colors.foreground, fontSize: 16, fontWeight: '600', fontFamily: 'Open Sans' }]}>
-                Email
-              </Text>
+                <Text style={[styles.topBarTitle, { color: colors.foreground, fontSize: 16, fontWeight: '600', fontFamily: 'Open Sans' }]}>
+                  Email
+                </Text>
+              </View>
             </View>
-          </View>
+          )}
 
-          <EmailAppView initialTab="Inbox" onOpenDrawer={() => setIsDrawerOpen(true)} />
+          <EmailAppView
+            initialTab="Inbox"
+            onOpenDrawer={() => setIsDrawerOpen(true)}
+            onViewStateChange={({ isDetailOpen, isComposing }) => {
+              setIsEmailDetailOrCompose(isDetailOpen || isComposing);
+            }}
+          />
         </View>
       ) : (
         /* ──────────────── Non-Chat Menu Items (Screenshot 1) ──────────────── */

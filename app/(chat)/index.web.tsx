@@ -109,6 +109,11 @@ export default function ChatWebScreen() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [showContactInfo, setShowContactInfo] = useState(false);
   const [externalReplyMap, setExternalReplyMap] = useState<Record<string, any>>({});
+  const [isEmailDetailOrCompose, setIsEmailDetailOrCompose] = useState(false);
+
+  useEffect(() => {
+    setIsEmailDetailOrCompose(false);
+  }, [mainNavId]);
 
   useEffect(() => {
     setShowContactInfo(false);
@@ -1349,7 +1354,7 @@ export default function ChatWebScreen() {
       ) : mainNavId === 'email' || mainNavId === 'mail' ? (
         /* ──────────────── Email & Messages App View ──────────────── */
         <View style={{ flex: 1, height: '100%', width: '100%', display: 'flex' as any, flexDirection: 'column' }}>
-          {isMobileOrTablet && (
+          {isMobileOrTablet && !isEmailDetailOrCompose && (
             <View
               style={[
                 styles.userTopBar,
@@ -1381,6 +1386,9 @@ export default function ChatWebScreen() {
           <EmailAppView
             initialTab="Inbox"
             onOpenDrawer={() => setIsDrawerOpen(true)}
+            onViewStateChange={({ isDetailOpen, isComposing }) => {
+              setIsEmailDetailOrCompose(isDetailOpen || isComposing);
+            }}
             rightOverlayView={
               isAppSettingsOpen ? (
                 <AppSettingsView
