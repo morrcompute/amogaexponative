@@ -13,11 +13,12 @@ on:
           - android
           - ios
       profile:
-        description: 'EAS Build Profile (preview = APK & iOS Simulator)'
+        description: 'EAS Build Profile (apk = Direct Android APK, preview = APK & iOS Simulator)'
         required: true
-        default: 'preview'
+        default: 'apk'
         type: choice
         options:
+          - apk
           - preview
           - preview:device
           - production
