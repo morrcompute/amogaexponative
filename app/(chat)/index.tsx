@@ -1121,7 +1121,6 @@ export default function MobileChatScreen() {
             flex: 1,
             backgroundColor: colors.background,
             paddingBottom: insets.bottom,
-            paddingTop: isEmailDetailOrCompose ? insets.top : 0,
             width: '100%',
           }}
         >

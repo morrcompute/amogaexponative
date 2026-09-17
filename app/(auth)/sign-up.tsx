@@ -53,9 +53,12 @@ export default function SignUpScreen() {
       password,
       options: {
         emailRedirectTo: redirectTo,
-        // Read by the handle_new_user trigger in 0001_profiles.sql, so the
-        // profile row has a name from the moment it exists.
-        data: { display_name: displayName.trim() || null },
+        // Read by the handle_new_user trigger, so the profile row has a name from the moment it exists.
+        data: {
+          display_name: displayName.trim() || null,
+          full_name: displayName.trim() || null,
+          name: displayName.trim() || null,
+        },
       },
     });
 
