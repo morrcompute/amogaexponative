@@ -1,3 +1,5 @@
+import 'react-native-gesture-handler';
+import 'react-native-reanimated';
 import '@/lib/polyfills';
 import { Spinner, ToastProvider, View } from 'amogamobileds-v1';
 import { AuthProvider, useAuth } from '@/providers/auth-provider';
@@ -9,7 +11,6 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import 'react-native-reanimated';
 import { useFonts } from 'expo-font';
 import {
   OpenSans_300Light,
@@ -106,6 +107,11 @@ export default function RootLayout() {
     }, 2500);
     return () => clearTimeout(timer);
   }, []);
+
+  // Keep native splash screen visible until fonts have loaded or errored
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

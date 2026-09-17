@@ -10,35 +10,82 @@
       "channel": "development",
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://nvxcqbisyeldjceouggb.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_f7pb9k7U2jT9GgyO4GC2rg_guymXYhK"
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_f7pb9k7U2jT9GgyO4GC2rg_guymXYhK",
+        "EXPO_PUBLIC_API_URL": "https://amoganativenew.vercel.app",
+        "EXPO_PUBLIC_BACKEND_URL": "https://amoganativenew.vercel.app",
+        "EXPO_PUBLIC_MAIL_USER": "ask@morrai.com",
+        "EXPO_PUBLIC_MAIL_PASS": "0un:ZX3JOs&E",
+        "EXPO_PUBLIC_SMTP_HOST": "smtp.hostinger.com",
+        "EXPO_PUBLIC_SMTP_PORT": "587",
+        "EXPO_PUBLIC_SMTP_USER": "ask@morrai.com",
+        "EXPO_PUBLIC_SMTP_PASS": "0un:ZX3JOs&E",
+        "EXPO_PUBLIC_SMTP_SECURE": "false",
+        "EXPO_PUBLIC_SMTP_REQUIRE_TLS": "true",
+        "EXPO_PUBLIC_IMAP_HOST": "imap.hostinger.com",
+        "EXPO_PUBLIC_IMAP_PORT": "993",
+        "EXPO_PUBLIC_IMAP_USER": "ask@morrai.com",
+        "EXPO_PUBLIC_IMAP_PASS": "0un:ZX3JOs&E",
+        "EXPO_PUBLIC_IMAP_SECURE": "true"
       }
     },
     "preview": {
       "distribution": "internal",
       "channel": "preview",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease -PreactNativeArchitectures=arm64-v8a"
       },
       "ios": {
         "simulator": true
       },
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://nvxcqbisyeldjceouggb.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_f7pb9k7U2jT9GgyO4GC2rg_guymXYhK"
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_f7pb9k7U2jT9GgyO4GC2rg_guymXYhK",
+        "EXPO_PUBLIC_API_URL": "https://amoganativenew.vercel.app",
+        "EXPO_PUBLIC_BACKEND_URL": "https://amoganativenew.vercel.app",
+        "EXPO_PUBLIC_MAIL_USER": "ask@morrai.com",
+        "EXPO_PUBLIC_MAIL_PASS": "0un:ZX3JOs&E",
+        "EXPO_PUBLIC_SMTP_HOST": "smtp.hostinger.com",
+        "EXPO_PUBLIC_SMTP_PORT": "587",
+        "EXPO_PUBLIC_SMTP_USER": "ask@morrai.com",
+        "EXPO_PUBLIC_SMTP_PASS": "0un:ZX3JOs&E",
+        "EXPO_PUBLIC_SMTP_SECURE": "false",
+        "EXPO_PUBLIC_SMTP_REQUIRE_TLS": "true",
+        "EXPO_PUBLIC_IMAP_HOST": "imap.hostinger.com",
+        "EXPO_PUBLIC_IMAP_PORT": "993",
+        "EXPO_PUBLIC_IMAP_USER": "ask@morrai.com",
+        "EXPO_PUBLIC_IMAP_PASS": "0un:ZX3JOs&E",
+        "EXPO_PUBLIC_IMAP_SECURE": "true"
       }
     },
     "apk": {
       "distribution": "internal",
       "channel": "preview",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease -PreactNativeArchitectures=arm64-v8a"
       },
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://nvxcqbisyeldjceouggb.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_f7pb9k7U2jT9GgyO4GC2rg_guymXYhK"
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_f7pb9k7U2jT9GgyO4GC2rg_guymXYhK",
+        "EXPO_PUBLIC_API_URL": "https://amoganativenew.vercel.app",
+        "EXPO_PUBLIC_BACKEND_URL": "https://amoganativenew.vercel.app",
+        "EXPO_PUBLIC_MAIL_USER": "ask@morrai.com",
+        "EXPO_PUBLIC_MAIL_PASS": "0un:ZX3JOs&E",
+        "EXPO_PUBLIC_SMTP_HOST": "smtp.hostinger.com",
+        "EXPO_PUBLIC_SMTP_PORT": "587",
+        "EXPO_PUBLIC_SMTP_USER": "ask@morrai.com",
+        "EXPO_PUBLIC_SMTP_PASS": "0un:ZX3JOs&E",
+        "EXPO_PUBLIC_SMTP_SECURE": "false",
+        "EXPO_PUBLIC_SMTP_REQUIRE_TLS": "true",
+        "EXPO_PUBLIC_IMAP_HOST": "imap.hostinger.com",
+        "EXPO_PUBLIC_IMAP_PORT": "993",
+        "EXPO_PUBLIC_IMAP_USER": "ask@morrai.com",
+        "EXPO_PUBLIC_IMAP_PASS": "0un:ZX3JOs&E",
+        "EXPO_PUBLIC_IMAP_SECURE": "true"
       }
     },
-    "preview:device": {
+    "apk:universal": {
       "distribution": "internal",
       "channel": "preview",
       "android": {
@@ -46,15 +93,48 @@
       },
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://nvxcqbisyeldjceouggb.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_f7pb9k7U2jT9GgyO4GC2rg_guymXYhK"
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_f7pb9k7U2jT9GgyO4GC2rg_guymXYhK",
+        "EXPO_PUBLIC_API_URL": "https://amoganativenew.vercel.app",
+        "EXPO_PUBLIC_BACKEND_URL": "https://amoganativenew.vercel.app",
+        "EXPO_PUBLIC_MAIL_USER": "ask@morrai.com",
+        "EXPO_PUBLIC_MAIL_PASS": "0un:ZX3JOs&E",
+        "EXPO_PUBLIC_SMTP_HOST": "smtp.hostinger.com",
+        "EXPO_PUBLIC_SMTP_PORT": "587",
+        "EXPO_PUBLIC_SMTP_USER": "ask@morrai.com",
+        "EXPO_PUBLIC_SMTP_PASS": "0un:ZX3JOs&E",
+        "EXPO_PUBLIC_SMTP_SECURE": "false",
+        "EXPO_PUBLIC_SMTP_REQUIRE_TLS": "true",
+        "EXPO_PUBLIC_IMAP_HOST": "imap.hostinger.com",
+        "EXPO_PUBLIC_IMAP_PORT": "993",
+        "EXPO_PUBLIC_IMAP_USER": "ask@morrai.com",
+        "EXPO_PUBLIC_IMAP_PASS": "0un:ZX3JOs&E",
+        "EXPO_PUBLIC_IMAP_SECURE": "true"
       }
     },
     "production": {
       "autoIncrement": true,
       "channel": "production",
+      "android": {
+        "buildType": "app-bundle"
+      },
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://nvxcqbisyeldjceouggb.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_f7pb9k7U2jT9GgyO4GC2rg_guymXYhK"
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_f7pb9k7U2jT9GgyO4GC2rg_guymXYhK",
+        "EXPO_PUBLIC_API_URL": "https://amoganativenew.vercel.app",
+        "EXPO_PUBLIC_BACKEND_URL": "https://amoganativenew.vercel.app",
+        "EXPO_PUBLIC_MAIL_USER": "ask@morrai.com",
+        "EXPO_PUBLIC_MAIL_PASS": "0un:ZX3JOs&E",
+        "EXPO_PUBLIC_SMTP_HOST": "smtp.hostinger.com",
+        "EXPO_PUBLIC_SMTP_PORT": "587",
+        "EXPO_PUBLIC_SMTP_USER": "ask@morrai.com",
+        "EXPO_PUBLIC_SMTP_PASS": "0un:ZX3JOs&E",
+        "EXPO_PUBLIC_SMTP_SECURE": "false",
+        "EXPO_PUBLIC_SMTP_REQUIRE_TLS": "true",
+        "EXPO_PUBLIC_IMAP_HOST": "imap.hostinger.com",
+        "EXPO_PUBLIC_IMAP_PORT": "993",
+        "EXPO_PUBLIC_IMAP_USER": "ask@morrai.com",
+        "EXPO_PUBLIC_IMAP_PASS": "0un:ZX3JOs&E",
+        "EXPO_PUBLIC_IMAP_SECURE": "true"
       }
     }
   },
