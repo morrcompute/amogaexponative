@@ -15,17 +15,17 @@ export interface MailConfig {
 }
 
 export const defaultMailConfig: MailConfig = {
-  email: 'ask@morrai.com',
-  password: '0un:ZX3JOs&E',
+  email: process.env.MAIL_USER || process.env.SMTP_USER || process.env.IMAP_USER || 'ask@morrai.com',
+  password: process.env.MAIL_PASS || process.env.SMTP_PASS || process.env.IMAP_PASS || '0un:ZX3JOs&E',
   smtp: {
-    host: 'smtp.hostinger.com',
-    port: 587,
-    secure: false,
-    requireTLS: true,
+    host: process.env.SMTP_HOST || 'smtp.hostinger.com',
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: process.env.SMTP_SECURE === 'true',
+    requireTLS: process.env.SMTP_REQUIRE_TLS !== 'false',
   },
   imap: {
-    host: 'imap.hostinger.com',
-    port: 993,
-    secure: true,
+    host: process.env.IMAP_HOST || 'imap.hostinger.com',
+    port: parseInt(process.env.IMAP_PORT || '993', 10),
+    secure: process.env.IMAP_SECURE !== 'false',
   },
 };
