@@ -12,12 +12,15 @@ export function createImapClient(customConfig?: Partial<MailConfig>) {
   };
 
   return new ImapFlow({
-    host: config.imap.host,
-    port: config.imap.port,
-    secure: config.imap.secure,
+    host: config.imap.host || 'imap.hostinger.com',
+    port: Number(config.imap.port) || 993,
+    secure: config.imap.secure !== false,
     auth: {
       user: config.email,
       pass: config.password,
+    },
+    tls: {
+      rejectUnauthorized: false,
     },
     logger: false,
   });

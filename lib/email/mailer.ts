@@ -11,15 +11,23 @@ export function createMailerTransporter(customConfig?: Partial<MailConfig>) {
     },
   };
 
+  const port = Number(config.smtp.port) || 465;
+  const isSecure = port === 465 || config.smtp.secure === true;
+
   return nodemailer.createTransport({
-    host: config.smtp.host,
-    port: config.smtp.port,
-    secure: config.smtp.secure,
-    requireTLS: config.smtp.requireTLS,
+    host: config.smtp.host || 'smtp.hostinger.com',
+    port: port,
+    secure: isSecure,
     auth: {
       user: config.email,
       pass: config.password,
     },
+    tls: {
+      rejectUnauthorized: false,
+    },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000,
   });
 }
 

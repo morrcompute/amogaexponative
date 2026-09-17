@@ -13,12 +13,17 @@ export default async function handler(req: any, res: any) {
     return res.status(200).end();
   }
 
+  if (req.method !== 'POST') {
+    return res.status(405).json({ success: false, message: 'Method Not Allowed' });
+  }
+
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
     const result = await sendEmail(body);
-    return res.status(result.success ? 200 : 500).json(result);
+    return res.status(200).json(result);
   } catch (error: any) {
-    return res.status(500).json({
+    console.error('API Send Error:', error);
+    return res.status(200).json({
       success: false,
       message: `API Error: ${error.message || error}`,
     });

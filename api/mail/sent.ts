@@ -17,18 +17,11 @@ export default async function handler(req: any, res: any) {
     const page = parseInt((req.query?.page as string) || '1', 10);
     const limit = parseInt((req.query?.limit as string) || '20', 10);
 
-    const configHeader = req.headers?.['x-mail-config'];
-    let customConfig;
-    if (configHeader && typeof configHeader === 'string') {
-      try {
-        customConfig = JSON.parse(configHeader);
-      } catch (_) {}
-    }
-
-    const result = await getSentEmails({ page, limit, customConfig });
-    return res.status(result.success ? 200 : 500).json(result);
+    const result = await getSentEmails({ page, limit });
+    return res.status(200).json(result);
   } catch (error: any) {
-    return res.status(500).json({
+    console.error('API Sent Error:', error);
+    return res.status(200).json({
       success: false,
       message: `API Error: ${error.message || error}`,
       emails: [],

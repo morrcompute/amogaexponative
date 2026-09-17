@@ -167,23 +167,26 @@ export async function sendEmail(payload: SendEmailPayload) {
   const config = { ...defaultMailConfig, ...customConfig };
   const transporter = createMailerTransporter(customConfig);
 
-  const formattedAttachments = attachments.map((att) => {
-    let rawContent = att.content || '';
-    if (rawContent.includes(';base64,')) {
-      rawContent = rawContent.split(';base64,').pop() || '';
-    }
-    return {
-      filename: att.filename,
-      contentType: att.contentType || 'application/octet-stream',
-      content: rawContent ? Buffer.from(rawContent, 'base64') : undefined,
-      path: att.path,
-    };
-  });
+  const formattedAttachments = (attachments || [])
+    .filter((att) => att && (att.content || att.path))
+    .map((att) => {
+      let rawContent = att.content || '';
+      if (rawContent.includes(';base64,')) {
+        rawContent = rawContent.split(';base64,').pop() || '';
+      }
+      return {
+        filename: att.filename,
+        contentType: att.contentType || 'application/octet-stream',
+        content: rawContent ? Buffer.from(rawContent, 'base64') : undefined,
+        path: att.path,
+      };
+    });
 
+  const senderEmail = config.email;
   const mailOptions: any = {
-    from: payload.from || `"${config.email.split('@')[0]}" <${config.email}>`,
+    from: payload.from || `"${senderEmail.split('@')[0]}" <${senderEmail}>`,
     to: Array.isArray(to) ? to.join(', ') : to,
-    subject,
+    subject: subject || '(No Subject)',
     text: text || html?.replace(/<[^>]*>?/gm, '') || '',
     html: html || text || '',
   };
@@ -194,21 +197,6 @@ export async function sendEmail(payload: SendEmailPayload) {
 
   try {
     const info = await transporter.sendMail(mailOptions);
-
-    // Save copy to INBOX.Sent via IMAP if possible
-    try {
-      const MailComposer = require('nodemailer/lib/mail-composer');
-      const composer = new MailComposer(mailOptions);
-      const rawMimeBuffer = await composer.compile().build();
-
-      const client = createImapClient(customConfig);
-      await client.connect();
-      await client.append('INBOX.Sent', rawMimeBuffer, ['\\Seen']);
-      await client.logout();
-    } catch (imapErr) {
-      console.warn('Could not append sent copy to IMAP INBOX.Sent:', imapErr);
-    }
-
     return {
       success: true,
       message: 'Email sent successfully',

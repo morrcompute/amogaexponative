@@ -19,9 +19,9 @@ export const defaultMailConfig: MailConfig = {
   password: process.env.MAIL_PASS || process.env.SMTP_PASS || process.env.IMAP_PASS || '0un:ZX3JOs&E',
   smtp: {
     host: process.env.SMTP_HOST || 'smtp.hostinger.com',
-    port: parseInt(process.env.SMTP_PORT || '587', 10),
-    secure: process.env.SMTP_SECURE === 'true',
-    requireTLS: process.env.SMTP_REQUIRE_TLS !== 'false',
+    port: parseInt(process.env.SMTP_PORT || '465', 10),
+    secure: process.env.SMTP_SECURE !== 'false',
+    requireTLS: process.env.SMTP_REQUIRE_TLS === 'true',
   },
   imap: {
     host: process.env.IMAP_HOST || 'imap.hostinger.com',
