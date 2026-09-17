@@ -310,3 +310,72 @@ export interface LocalFileRecord {
   period_id?: number | null;
   period_name?: string | null;
 }
+
+export interface LocalConversationRecord {
+  id: string;
+  type: 'direct' | 'group' | 'channel_group' | 'message_group';
+  name?: string | null;
+  image?: string | null;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  unread_count?: number;
+  last_message_text?: string | null;
+  last_message_time?: string | null;
+  other_member_json?: string | null;
+  members_count?: number;
+}
+
+export interface LocalConversationMemberRecord {
+  id?: string;
+  conversation_id: string;
+  user_id: string;
+  role?: string;
+  unread_count?: number;
+  joined_at?: string;
+}
+
+export interface LocalChatMessageRecord {
+  id: string;
+  conversation_id: string;
+  owner_user_id: string;
+  sender_user_id: string;
+  message?: string | null;
+  message_type?: string;
+  direction: 'Sent' | 'Received';
+  sent?: number | boolean;
+  received?: number | boolean;
+  created_at?: string;
+  file_url?: string | null;
+  file_name?: string | null;
+  file_size?: number | null;
+  mime_type?: string | null;
+  duration?: number | null;
+  thumbnail?: string | null;
+  is_read?: number | boolean;
+  is_starred?: number | boolean;
+  is_pinned?: number | boolean;
+  is_deleted?: number | boolean;
+  sync_status?: 'pending' | 'synced' | 'failed';
+  replyto_message_id?: string | null;
+  replyto_user_id?: string | null;
+  replyto_content?: string | null;
+  replyemoji?: string | null;
+  forwardto_message_id?: string | null;
+  sender_message_id?: string | null;
+}
+
+export interface LocalContactRecord {
+  id: string;
+  owner_id: string;
+  contact_user_id: string;
+  name?: string | null;
+  nickname?: string | null;
+  email?: string | null;
+  mobile?: string | null;
+  avatar?: string | null;
+  avatar_url?: string | null;
+  status?: string | null;
+  created_at?: string;
+}
+

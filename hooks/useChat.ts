@@ -14,6 +14,11 @@ import {
   createGroupConversation,
 } from '@/lib/chat-service';
 import type { ChatMessage, Profile } from '@/lib/database.types';
+import {
+  LocalChatService,
+  type LocalConversationRecord,
+  type LocalChatMessageRecord,
+} from '@/lib/local-db';
 import { useToast, type AttachmentOptionType } from 'amogamobileds-v1';
 import { Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -64,27 +69,134 @@ export function useChat() {
   // Active conversation object
   const activeConversation = conversations.find((c) => c.id === activeConversationId) || null;
 
-  // 1. Load user conversations
+  // 1. Load user conversations (offline local first, then sync with Supabase)
   const loadConversations = useCallback(async () => {
     if (!user) return;
     setLoadingConversations(true);
-    const convos = await fetchUserConversations(user.id);
-    setConversations(convos);
-    setLoadingConversations(false);
+
+    // Step A: Load instantly from local storage (0ms offline latency)
+    try {
+      const localList = await LocalChatService.getConversations(user.id);
+      if (localList && localList.length > 0) {
+        const mapped: EnrichedConversation[] = localList.map((c) => ({
+          id: c.id,
+          type: c.type,
+          name: c.name || null,
+          image: c.image || null,
+          created_by: c.created_by || null,
+          created_at: c.created_at || new Date().toISOString(),
+          unreadCount: c.unread_count || 0,
+          otherMember: c.other_member_json ? JSON.parse(c.other_member_json) : null,
+          lastMessage: c.last_message_text
+            ? ({
+                id: `local-last-${c.id}`,
+                conversation_id: c.id,
+                owner_user_id: user.id,
+                sender_user_id: user.id,
+                message: c.last_message_text,
+                created_at: c.last_message_time || c.updated_at || new Date().toISOString(),
+                direction: 'Sent',
+                sent: true,
+                received: false,
+                message_type: 'text',
+              } as any)
+            : null,
+          membersCount: c.members_count || 2,
+        }));
+        setConversations(mapped);
+        setLoadingConversations(false);
+      }
+    } catch (err) {
+      console.warn('Could not read local conversations:', err);
+    }
+
+    // Step B: Remote fetch from Supabase (if online) & update local storage
+    try {
+      const convos = await fetchUserConversations(user.id);
+      if (convos && convos.length > 0) {
+        setConversations(convos);
+        const toCache: LocalConversationRecord[] = convos.map((c) => ({
+          id: c.id,
+          type: c.type,
+          name: c.name,
+          image: c.image,
+          created_by: c.created_by,
+          created_at: c.created_at,
+          updated_at: c.lastMessage?.created_at || c.created_at,
+          unread_count: c.unreadCount || 0,
+          last_message_text: c.lastMessage?.message || null,
+          last_message_time: c.lastMessage?.created_at || c.created_at,
+          other_member_json: c.otherMember ? JSON.stringify(c.otherMember) : null,
+          members_count: c.membersCount || 2,
+        }));
+        await LocalChatService.saveConversations(toCache);
+      }
+    } catch (err) {
+      console.warn('Offline / Network error fetching remote conversations, using local cache:', err);
+    } finally {
+      setLoadingConversations(false);
+    }
   }, [user]);
 
   useEffect(() => {
     loadConversations();
   }, [loadConversations]);
 
-  // 2. Load messages when active conversation changes
+  // 2. Load messages when active conversation changes (offline local first, then sync)
   const loadMessages = useCallback(
     async (convoId: string) => {
       if (!user) return;
       setLoadingMessages(true);
-      const msgs = await fetchConversationMessages(convoId, user.id);
-      setMessages(msgs);
-      setLoadingMessages(false);
+
+      // Step A: Load instantly from local storage (0ms offline latency)
+      try {
+        const localMsgs = await LocalChatService.getMessages(convoId, user.id);
+        if (localMsgs && localMsgs.length > 0) {
+          setMessages(localMsgs as any);
+          setLoadingMessages(false);
+        }
+      } catch (err) {
+        console.warn('Could not read local messages:', err);
+      }
+
+      // Step B: Remote fetch from Supabase (if online) & cache locally
+      try {
+        const msgs = await fetchConversationMessages(convoId, user.id);
+        if (msgs && msgs.length > 0) {
+          setMessages(msgs);
+          const toCache: LocalChatMessageRecord[] = msgs.map((m) => ({
+            id: m.id,
+            conversation_id: m.conversation_id,
+            owner_user_id: m.owner_user_id,
+            sender_user_id: m.sender_user_id || m.owner_user_id,
+            message: m.message,
+            message_type: m.message_type,
+            direction: m.direction,
+            sent: m.sent ? 1 : 0,
+            received: m.received ? 1 : 0,
+            created_at: m.created_at,
+            file_url: m.file_url,
+            file_name: m.file_name,
+            file_size: m.file_size,
+            mime_type: m.mime_type,
+            duration: m.duration,
+            thumbnail: m.thumbnail,
+            is_read: m.sent ? 1 : 0,
+            is_starred: m.star ? 1 : 0,
+            is_pinned: m.pin ? 1 : 0,
+            is_deleted: m.deleted ? 1 : 0,
+            sync_status: 'synced',
+            replyto_message_id: m.replyto_message_id,
+            replyto_user_id: m.replyto_user_id,
+            sender_message_id: m.sender_message_id,
+          }));
+          await LocalChatService.saveMessages(toCache);
+        }
+      } catch (err) {
+        console.warn('Offline / Network error fetching remote messages, using local cache:', err);
+      } finally {
+        setLoadingMessages(false);
+      }
     },
     [user]
   );
@@ -111,8 +223,27 @@ export function useChat() {
           table: 'chat_messages',
           filter: `owner_user_id=eq.${user.id}`,
         },
-        (payload) => {
+        async (payload) => {
           const newMsg = payload.new;
+          // Persist to local storage immediately
+          await LocalChatService.saveMessage({
+            id: newMsg.id,
+            conversation_id: newMsg.conversation_id,
+            owner_user_id: newMsg.owner_user_id,
+            sender_user_id: newMsg.sender_user_id || newMsg.owner_user_id,
+            message: newMsg.message,
+            message_type: newMsg.message_type,
+            direction: newMsg.direction,
+            sent: newMsg.sent ? 1 : 0,
+            received: newMsg.received ? 1 : 0,
+            created_at: newMsg.created_at,
+            file_url: newMsg.file_url,
+            file_name: newMsg.file_name,
+            file_size: newMsg.file_size,
+            mime_type: newMsg.mime_type,
+            sync_status: 'synced',
+          }).catch(() => {});
+
           if (newMsg.conversation_id === activeConvoIdRef.current) {
             setMessages((prev) => {
               if (prev.some((m) => m.id === newMsg.id)) return prev;
@@ -130,8 +261,23 @@ export function useChat() {
           table: 'chat_messages',
           filter: `owner_user_id=eq.${user.id}`,
         },
-        (payload) => {
+        async (payload) => {
           const updatedMsg = payload.new;
+          await LocalChatService.saveMessage({
+            id: updatedMsg.id,
+            conversation_id: updatedMsg.conversation_id,
+            owner_user_id: updatedMsg.owner_user_id,
+            sender_user_id: updatedMsg.sender_user_id || updatedMsg.owner_user_id,
+            message: updatedMsg.message,
+            message_type: updatedMsg.message_type,
+            direction: updatedMsg.direction,
+            sent: updatedMsg.sent ? 1 : 0,
+            received: updatedMsg.received ? 1 : 0,
+            created_at: updatedMsg.created_at,
+            is_deleted: updatedMsg.deleted ? 1 : 0,
+            sync_status: 'synced',
+          }).catch(() => {});
+
           if (updatedMsg.conversation_id === activeConvoIdRef.current) {
             setMessages((prev) =>
               prev.map((m) => (m.id === updatedMsg.id ? updatedMsg : m))
@@ -264,7 +410,7 @@ export function useChat() {
     };
   }, [user]);
 
-  // 4. Send text message
+  // 4. Send text message (optimistic local save first, then Supabase sync)
   const handleSendMessage = async () => {
     if (!user || !activeConversationId || !inputText.trim() || isSending) return;
 
@@ -274,17 +420,47 @@ export function useChat() {
     setReplyMessage(null);
     setIsSending(true);
 
+    const now = new Date().toISOString();
+    const tempId = `local-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+
+    const optimisticRecord: LocalChatMessageRecord = {
+      id: tempId,
+      conversation_id: activeConversationId,
+      owner_user_id: user.id,
+      sender_user_id: user.id,
+      message: text,
+      message_type: 'text',
+      direction: 'Sent',
+      sent: 1,
+      received: 0,
+      created_at: now,
+      sync_status: 'pending',
+      replyto_message_id: reply?.id || null,
+      replyto_content: reply?.content || null,
+      replyto_user_id: null,
+    };
+
+    // 1. Immediately save to local SQLite / Web storage
+    await LocalChatService.saveMessage(optimisticRecord).catch(() => {});
+
+    // 2. Immediately update state so user sees message instantly
+    setMessages((prev) => [...prev, optimisticRecord as any]);
+    loadConversations();
+
     try {
-      await sendChatMessage({
+      const sent = await sendChatMessage({
         conversationId: activeConversationId,
         senderId: user.id,
         messageText: text,
         messageType: 'text',
         replyToMessageId: reply?.id,
       });
+
+      if (sent) {
+        await LocalChatService.updateMessageStatus(tempId, { sync_status: 'synced' });
+      }
     } catch (err) {
-      console.error('Failed to send message:', err);
-      toast.error('Message failed to send');
+      console.warn('Message saved locally (offline / network error syncing to Supabase):', err);
     } finally {
       setIsSending(false);
     }

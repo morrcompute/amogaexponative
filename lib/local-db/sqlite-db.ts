@@ -370,6 +370,99 @@ async function createTables(db: any) {
     CREATE INDEX IF NOT EXISTS idx_local_files_folder ON local_files(folder_name);
     CREATE INDEX IF NOT EXISTS idx_local_files_status ON local_files(status);
   `);
+
+  // 3. Create local_conversations table
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS local_conversations (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      name TEXT,
+      image TEXT,
+      created_by TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      unread_count INTEGER DEFAULT 0,
+      last_message_text TEXT,
+      last_message_time TEXT,
+      other_member_json TEXT,
+      members_count INTEGER DEFAULT 2
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_local_convos_updated ON local_conversations(updated_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_local_convos_type ON local_conversations(type);
+  `);
+
+  // 4. Create local_conversation_members table
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS local_conversation_members (
+      id TEXT PRIMARY KEY,
+      conversation_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      role TEXT DEFAULT 'member',
+      unread_count INTEGER DEFAULT 0,
+      joined_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_local_members_convo ON local_conversation_members(conversation_id);
+    CREATE INDEX IF NOT EXISTS idx_local_members_user ON local_conversation_members(user_id);
+  `);
+
+  // 5. Create local_chat_messages table
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS local_chat_messages (
+      id TEXT PRIMARY KEY,
+      conversation_id TEXT NOT NULL,
+      owner_user_id TEXT NOT NULL,
+      sender_user_id TEXT NOT NULL,
+      message TEXT,
+      message_type TEXT DEFAULT 'text',
+      direction TEXT NOT NULL,
+      sent INTEGER DEFAULT 1,
+      received INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      file_url TEXT,
+      file_name TEXT,
+      file_size INTEGER,
+      mime_type TEXT,
+      duration INTEGER,
+      thumbnail TEXT,
+      is_read INTEGER DEFAULT 0,
+      is_starred INTEGER DEFAULT 0,
+      is_pinned INTEGER DEFAULT 0,
+      is_deleted INTEGER DEFAULT 0,
+      sync_status TEXT DEFAULT 'synced',
+      replyto_message_id TEXT,
+      replyto_user_id TEXT,
+      replyto_content TEXT,
+      replyemoji TEXT,
+      forwardto_message_id TEXT,
+      sender_message_id TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_local_chat_msgs_convo ON local_chat_messages(conversation_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_local_chat_msgs_owner ON local_chat_messages(owner_user_id);
+    CREATE INDEX IF NOT EXISTS idx_local_chat_msgs_sync ON local_chat_messages(sync_status);
+  `);
+
+  // 6. Create local_contacts table
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS local_contacts (
+      id TEXT PRIMARY KEY,
+      owner_id TEXT NOT NULL,
+      contact_user_id TEXT NOT NULL,
+      name TEXT,
+      nickname TEXT,
+      email TEXT,
+      mobile TEXT,
+      avatar TEXT,
+      avatar_url TEXT,
+      status TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_local_contacts_owner ON local_contacts(owner_id);
+    CREATE INDEX IF NOT EXISTS idx_local_contacts_target ON local_contacts(contact_user_id);
+  `);
 }
 
 function createWebMockDb() {
@@ -445,6 +538,102 @@ function createWebMockDb() {
         return { changes: 1 };
       }
 
+      if (q.startsWith('INSERT INTO LOCAL_CONVERSATIONS')) {
+        const list = getItem('conversations');
+        const record: any = {
+          id: params[0],
+          type: params[1],
+          name: params[2],
+          image: params[3],
+          created_by: params[4],
+          created_at: params[5] || new Date().toISOString(),
+          updated_at: params[6] || new Date().toISOString(),
+          unread_count: params[7] || 0,
+          last_message_text: params[8] || '',
+          last_message_time: params[9] || new Date().toISOString(),
+          other_member_json: params[10] || null,
+          members_count: params[11] || 2,
+        };
+        const filtered = list.filter((c) => c.id !== record.id);
+        filtered.unshift(record);
+        setItem('conversations', filtered);
+        return { changes: 1, lastInsertRowId: 1 };
+      }
+
+      if (q.startsWith('UPDATE LOCAL_CONVERSATIONS')) {
+        const list = getItem('conversations');
+        const id = params[params.length - 1];
+        const updated = list.map((c) => (c.id === id ? { ...c, ...params } : c));
+        setItem('conversations', updated);
+        return { changes: 1 };
+      }
+
+      if (q.startsWith('INSERT INTO LOCAL_CHAT_MESSAGES')) {
+        const list = getItem('chat_messages');
+        const record: any = {
+          id: params[0],
+          conversation_id: params[1],
+          owner_user_id: params[2],
+          sender_user_id: params[3],
+          message: params[4] || '',
+          message_type: params[5] || 'text',
+          direction: params[6],
+          sent: params[7] ?? 1,
+          received: params[8] ?? 0,
+          created_at: params[9] || new Date().toISOString(),
+          file_url: params[10] || null,
+          file_name: params[11] || null,
+          file_size: params[12] || null,
+          mime_type: params[13] || null,
+          duration: params[14] || null,
+          thumbnail: params[15] || null,
+          is_read: params[16] || 0,
+          is_starred: params[17] || 0,
+          is_pinned: params[18] || 0,
+          is_deleted: params[19] || 0,
+          sync_status: params[20] || 'synced',
+          replyto_message_id: params[21] || null,
+          replyto_user_id: params[22] || null,
+          replyto_content: params[23] || null,
+          replyemoji: params[24] || null,
+          forwardto_message_id: params[25] || null,
+          sender_message_id: params[26] || null,
+        };
+        const filtered = list.filter((m) => m.id !== record.id);
+        filtered.push(record);
+        setItem('chat_messages', filtered);
+        return { changes: 1, lastInsertRowId: 1 };
+      }
+
+      if (q.startsWith('UPDATE LOCAL_CHAT_MESSAGES')) {
+        const list = getItem('chat_messages');
+        const id = params[params.length - 1];
+        const updated = list.map((m) => (m.id === id ? { ...m, ...params } : m));
+        setItem('chat_messages', updated);
+        return { changes: 1 };
+      }
+
+      if (q.startsWith('INSERT INTO LOCAL_CONTACTS')) {
+        const list = getItem('contacts');
+        const record: any = {
+          id: params[0],
+          owner_id: params[1],
+          contact_user_id: params[2],
+          name: params[3],
+          nickname: params[4],
+          email: params[5],
+          mobile: params[6],
+          avatar: params[7],
+          avatar_url: params[8],
+          status: params[9],
+          created_at: params[10] || new Date().toISOString(),
+        };
+        const filtered = list.filter((c) => c.id !== record.id);
+        filtered.push(record);
+        setItem('contacts', filtered);
+        return { changes: 1, lastInsertRowId: 1 };
+      }
+
       return { changes: 1, lastInsertRowId: 1 };
     },
     getAllAsync: async (query: string, params: any[] = []) => {
@@ -465,6 +654,26 @@ function createWebMockDb() {
         }
         return list.filter((f) => !f.is_delete);
       }
+      if (q.includes('LOCAL_CONVERSATIONS')) {
+        const list = getItem('conversations');
+        return list;
+      }
+      if (q.includes('LOCAL_CHAT_MESSAGES')) {
+        const list = getItem('chat_messages');
+        const convoId = params[0];
+        if (convoId) {
+          return list.filter((m) => m.conversation_id === convoId && !m.is_deleted);
+        }
+        return list.filter((m) => !m.is_deleted);
+      }
+      if (q.includes('LOCAL_CONTACTS')) {
+        const list = getItem('contacts');
+        const ownerId = params[0];
+        if (ownerId) {
+          return list.filter((c) => c.owner_id === ownerId);
+        }
+        return list;
+      }
       return [];
     },
     getFirstAsync: async (query: string, params: any[] = []) => {
@@ -478,6 +687,21 @@ function createWebMockDb() {
         const list = getItem('files');
         const id = params[0];
         return list.find((f) => f.file_id === id || f.file_uuid === id) || null;
+      }
+      if (q.includes('LOCAL_CONVERSATIONS')) {
+        const list = getItem('conversations');
+        const id = params[0];
+        return list.find((c) => c.id === id) || null;
+      }
+      if (q.includes('LOCAL_CHAT_MESSAGES')) {
+        const list = getItem('chat_messages');
+        const id = params[0];
+        return list.find((m) => m.id === id) || null;
+      }
+      if (q.includes('LOCAL_CONTACTS')) {
+        const list = getItem('contacts');
+        const id = params[0];
+        return list.find((c) => c.id === id) || null;
       }
       return null;
     },

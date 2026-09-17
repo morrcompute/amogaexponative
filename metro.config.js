@@ -36,19 +36,23 @@ if (hasCentralRepo) {
  */
 function resolveWithExtensions(basePath) {
   const extensions = [
-    '',           // exact match (e.g. already has extension)
+    '', // exact file match
     '.ts',
     '.tsx',
     '.js',
     '.jsx',
-    '/index.ts',
-    '/index.tsx',
-    '/index.js',
+    path.sep + 'index.ts',
+    path.sep + 'index.tsx',
+    path.sep + 'index.js',
   ];
   for (const ext of extensions) {
-    const candidate = basePath + ext;
+    const candidate = path.normalize(basePath + ext);
     if (fs.existsSync(candidate)) {
-      return candidate;
+      try {
+        if (fs.statSync(candidate).isFile()) {
+          return candidate;
+        }
+      } catch (_) {}
     }
   }
   return null;
@@ -65,8 +69,6 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     if (resolved) {
       return { type: 'sourceFile', filePath: resolved };
     }
-    // Fallback: return without extension and let metro figure it out
-    return { type: 'sourceFile', filePath: basePath };
   }
 
   // @ds/ maps to the central design system root
@@ -77,7 +79,6 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     if (resolved) {
       return { type: 'sourceFile', filePath: resolved };
     }
-    return { type: 'sourceFile', filePath: basePath };
   }
 
   // amogamobileds-v1 maps to the central repo's index
