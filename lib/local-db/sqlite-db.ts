@@ -1130,9 +1130,9 @@ function createWebMockDb() {
         const record: any = {
           id: params[0],
           email: params[1],
-          encrypted_password: params[2],
+          phone: params[2] || null,
           raw_user_meta_data: typeof params[3] === 'object' ? JSON.stringify(params[3]) : params[3] || '{}',
-          raw_app_meta_data: params[4] || '{"provider":"email","providers":["email"]}',
+          raw_app_meta_data: typeof params[4] === 'object' ? JSON.stringify(params[4]) : params[4] || '{"provider":"email","providers":["email"]}',
           created_at: params[5] || new Date().toISOString(),
           updated_at: params[6] || new Date().toISOString(),
           aud: 'authenticated',
@@ -1163,6 +1163,7 @@ function createWebMockDb() {
           avatar: params[4] || null,
           avatar_url: params[5] || params[4] || null,
           mobile: params[6] || null,
+          company: params[7] || null,
           status: 'offline',
           online: 0,
           offline: 1,
@@ -1389,4 +1390,89 @@ function createWebMockDb() {
   };
 }
 
+/**
+ * Persists Supabase auth user metadata and profile locally into SQLite.
+ * This guarantees the user's ID, name, email, phone, and metadata are saved on the device.
+ */
+export async function saveLocalProfile(profile: any, userMetadata?: any, appMetadata?: any) {
+  if (!profile?.id) return;
+  try {
+    const db = await getLocalDatabase();
+    const rawUserMeta = typeof userMetadata === 'object' ? JSON.stringify(userMetadata) : (userMetadata || '{}');
+    const rawAppMeta = typeof appMetadata === 'object' ? JSON.stringify(appMetadata) : (appMetadata || '{"provider":"email","providers":["email"]}');
 
+    // 1. Save or update auth_users record
+    await db.runAsync(
+      `INSERT INTO auth_users (id, email, phone, raw_user_meta_data, raw_app_meta_data, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+       ON CONFLICT(id) DO UPDATE SET
+         email = COALESCE(excluded.email, auth_users.email),
+         phone = COALESCE(excluded.phone, auth_users.phone),
+         raw_user_meta_data = COALESCE(excluded.raw_user_meta_data, auth_users.raw_user_meta_data),
+         raw_app_meta_data = COALESCE(excluded.raw_app_meta_data, auth_users.raw_app_meta_data),
+         updated_at = datetime('now')`,
+      [
+        profile.id,
+        profile.email || null,
+        profile.mobile || null,
+        rawUserMeta,
+        rawAppMeta,
+      ]
+    );
+
+    // 2. Save or update profiles record
+    await db.runAsync(
+      `INSERT INTO profiles (id, name, display_name, email, avatar, avatar_url, mobile, company, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+       ON CONFLICT(id) DO UPDATE SET
+         name = COALESCE(excluded.name, profiles.name),
+         display_name = COALESCE(excluded.display_name, profiles.display_name),
+         email = COALESCE(excluded.email, profiles.email),
+         avatar = COALESCE(excluded.avatar, profiles.avatar),
+         avatar_url = COALESCE(excluded.avatar_url, profiles.avatar_url),
+         mobile = COALESCE(excluded.mobile, profiles.mobile),
+         company = COALESCE(excluded.company, profiles.company),
+         updated_at = datetime('now')`,
+      [
+        profile.id,
+        profile.name || null,
+        profile.display_name || profile.name || null,
+        profile.email || null,
+        profile.avatar || null,
+        profile.avatar_url || profile.avatar || null,
+        profile.mobile || null,
+        profile.company || null,
+      ]
+    );
+  } catch (err) {
+    console.warn('Error saving profile to local SQLite:', err);
+  }
+}
+
+/**
+ * Fetches a user's profile from local SQLite.
+ */
+export async function getLocalProfile(userId: string) {
+  if (!userId) return null;
+  try {
+    const db = await getLocalDatabase();
+    return await db.getFirstAsync(`SELECT * FROM profiles WHERE id = ? LIMIT 1`, [userId]);
+  } catch (err) {
+    console.warn('Error reading local profile:', err);
+    return null;
+  }
+}
+
+/**
+ * Fetches a user's auth record from local SQLite auth_users table.
+ */
+export async function getLocalUser(userId: string) {
+  if (!userId) return null;
+  try {
+    const db = await getLocalDatabase();
+    return await db.getFirstAsync(`SELECT * FROM auth_users WHERE id = ? LIMIT 1`, [userId]);
+  } catch (err) {
+    console.warn('Error reading local user:', err);
+    return null;
+  }
+}

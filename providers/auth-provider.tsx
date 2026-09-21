@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/lib/database.types';
-import { LocalChatService } from '@/lib/local-db';
+import { LocalChatService, saveLocalProfile, getLocalProfile } from '@/lib/local-db';
 
 interface AuthContextType {
   /** `null` once resolved and signed out; the session while signed in. */
@@ -33,14 +33,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const userId = session?.user.id ?? null;
 
   const loadProfile = useCallback(async (id: string, currentUser?: User | null) => {
-    let { data } = await supabase
+    // 1. Try reading from local SQLite first so profile is available immediately
+    const localCached = await getLocalProfile(id);
+    if (localCached) {
+      setProfile(localCached as Profile);
+    }
+
+    let { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', id)
       .maybeSingle();
 
     // If profile row doesn't exist yet in public.profiles, automatically create/upsert it
-    if (!data && currentUser) {
+    if (!data && currentUser && !error) {
       const displayName =
         currentUser.user_metadata?.name ||
         currentUser.user_metadata?.full_name ||
@@ -66,7 +72,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data = created ?? (fallback as any);
     }
 
-    setProfile(data ?? null);
+    if (data) {
+      setProfile(data);
+      // Persist to local SQLite so offline reads and local tables stay in sync
+      await saveLocalProfile(data, currentUser?.user_metadata, currentUser?.app_metadata);
+    }
   }, []);
 
   useEffect(() => {
@@ -100,13 +110,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearTimeout(safetyTimer);
       setSession(nextSession);
       setLoading(false);
+      if (nextSession?.user) {
+        loadProfile(nextSession.user.id, nextSession.user);
+      }
     });
 
     return () => {
       active = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [loadProfile]);
 
   useEffect(() => {
     if (!userId) return;
@@ -131,7 +144,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
         (payload) => {
           if (payload.eventType === 'DELETE') setProfile(null);
-          else setProfile(payload.new);
+          else {
+            setProfile(payload.new);
+            saveLocalProfile(payload.new, session?.user?.user_metadata, session?.user?.app_metadata);
+          }
         }
       )
       .subscribe();
@@ -139,7 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId]);
+  }, [userId, session?.user]);
 
   useEffect(() => {
     /**
@@ -198,8 +214,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [userId]);
 
   const refreshProfile = useCallback(async () => {
-    if (userId) await loadProfile(userId);
-  }, [userId, loadProfile]);
+    if (userId) await loadProfile(userId, session?.user);
+  }, [userId, session?.user, loadProfile]);
 
   return (
     <AuthContext.Provider
