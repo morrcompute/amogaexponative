@@ -81,11 +81,19 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     }
   }
 
-  // amogamobileds-v1 maps to the central repo's index
+  // amogamobileds-v1 maps to the central repo's index or subpath
   if (moduleName === 'amogamobileds-v1') {
     const directIndex = path.resolve(dsRoot, 'index.ts');
     if (fs.existsSync(directIndex)) {
       return { type: 'sourceFile', filePath: directIndex };
+    }
+  }
+  if (moduleName.startsWith('amogamobileds-v1/')) {
+    const subpath = moduleName.replace(/^amogamobileds-v1\//, '');
+    const candidate = path.resolve(dsRoot, subpath);
+    const resolved = resolveWithExtensions(candidate);
+    if (resolved) {
+      return { type: 'sourceFile', filePath: resolved };
     }
   }
 
