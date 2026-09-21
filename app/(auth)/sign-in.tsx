@@ -2,12 +2,17 @@ import React from 'react';
 import { SigninPageView } from 'amogamobileds-v1';
 import { router } from 'expo-router';
 import { saveLocalProfile } from '@/lib/local-db';
+import { supabase } from '@/lib/supabase';
 
 export default function SignInScreen() {
   return (
     <SigninPageView
+      supabaseClient={supabase}
       onSignUpPress={() => router.push('/(auth)/sign-up')}
-      onSuccess={async (user) => {
+      onSuccess={async (user, session) => {
+        if (session) {
+          await supabase.auth.setSession(session).catch(() => {});
+        }
         if (user) {
           await saveLocalProfile(
             {
