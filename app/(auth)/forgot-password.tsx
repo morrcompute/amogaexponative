@@ -1,97 +1,155 @@
+import React, { useState } from 'react';
 import {
-  Button,
-  Input,
+  Platform,
   Text,
-  useToast,
-  AuthScreen,
-} from 'amogamobileds-v1';
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { KeyRound, Mail } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { Button, useColorScheme, useColorTheme, useToast } from 'amogamobileds-v1';
 import { supabase } from '@/lib/supabase';
 import { makeRedirectUri } from 'expo-auth-session';
-import { router } from 'expo-router';
-import { Mail } from 'lucide-react-native';
-import { useState } from 'react';
+import {
+  AuthCardContainer,
+  AuthBanner,
+} from '@/components/auth/auth-card-container';
 
-/**
- * The recovery email links here. Supabase appends the PKCE code, the deep-link
- * handler in providers/auth-provider.tsx exchanges it for a session, and the
- * user lands on `/reset-password` already authenticated — which is what lets
- * `updateUser` work without an old password.
- */
 const redirectTo = makeRedirectUri({ path: 'reset-password' });
 
 export default function ForgotPasswordScreen() {
-  const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const isDark = useColorScheme() === 'dark';
+  const { currentTheme } = useColorTheme();
   const toast = useToast();
 
-  const send = async () => {
-    setLoading(true);
+  const accent = isDark
+    ? currentTheme?.name && currentTheme.name !== 'zinc' && currentTheme.preview
+      ? currentTheme.preview
+      : '#818cf8'
+    : currentTheme?.name && currentTheme.name !== 'zinc'
+    ? currentTheme.preview
+    : '#18181b';
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo,
-    });
+  const border = isDark ? '#232734' : '#e2e8f0';
+  const text = isDark ? '#f8fafc' : '#0f172a';
+  const muted = isDark ? '#94a3b8' : '#64748b';
+  const inputBg = isDark ? '#0c0f17' : '#f8fafc';
 
-    setLoading(false);
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [banner, setBanner] = useState<AuthBanner | null>(null);
 
-    if (error) {
-      toast.error('Could not send the email', error.message);
+  const handleSend = async () => {
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setBanner({ type: 'error', message: 'Please enter your email address.' });
       return;
     }
 
-    // Supabase returns success whether or not the address has an account, so
-    // that this form cannot be used to enumerate users. Say the same thing back.
-    setSent(true);
+    setLoading(true);
+    setBanner(null);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
+        redirectTo,
+      });
+
+      if (error) throw error;
+
+      setBanner({
+        type: 'success',
+        message: 'Reset instructions sent to your email! Please check your inbox.',
+      });
+      toast.success('Email sent', 'Check your inbox for the reset link.');
+    } catch (err: any) {
+      const msg = err.message || 'Could not send reset instructions.';
+      setBanner({ type: 'error', message: msg });
+      toast.error('Request failed', msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (sent) {
-    return (
-      <AuthScreen
-        title='Check your email'
-        subtitle={`If an account exists for ${email.trim()}, a reset link is on its way.`}
-      >
-        <Text variant='caption'>
-          The link opens this app and takes you straight to a new-password
-          screen. It expires in an hour.
-        </Text>
-
-        <Button onPress={() => router.replace('/sign-in')}>
-          Back to sign in
-        </Button>
-      </AuthScreen>
-    );
-  }
-
   return (
-    <AuthScreen
-      title='Reset your password'
-      subtitle='We will email you a link.'
+    <AuthCardContainer
+      icon={KeyRound}
+      iconBg="#f59e0b20"
+      iconColor="#f59e0b"
+      title="Forgot password?"
+      subtitle="No worries, we'll send you reset instructions."
+      banner={banner}
       footer={
-        <Button variant='ghost' onPress={() => router.back()}>
-          Back to sign in
-        </Button>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => router.replace('/sign-in')}
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingVertical: 8,
+          }}
+        >
+          <Text style={{ fontSize: 13, fontWeight: '600', color: accent }}>
+            ← Back to sign in
+          </Text>
+        </TouchableOpacity>
       }
     >
-      <Input
-        label='Email'
-        icon={Mail}
-        placeholder='you@example.com'
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize='none'
-        autoComplete='email'
-        keyboardType='email-address'
-        textContentType='emailAddress'
-        onSubmitEditing={() => email.trim() && send()}
-      />
+      <View style={{ gap: 14 }}>
+        {/* Email Field */}
+        <View style={{ gap: 5 }}>
+          <Text style={{ fontSize: 12, fontWeight: '600', color: text }}>
+            Email address
+          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              height: 44,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: border,
+              backgroundColor: inputBg,
+              paddingHorizontal: 12,
+              gap: 8,
+            }}
+          >
+            <Mail size={16} color="#94a3b8" />
+            <TextInput
+              style={{
+                flex: 1,
+                fontSize: 13.5,
+                color: text,
+                padding: 0,
+                ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}),
+              }}
+              value={email}
+              onChangeText={(val) => {
+                setEmail(val);
+                if (banner) setBanner(null);
+              }}
+              placeholder="you@example.com"
+              placeholderTextColor="#94a3b8"
+              autoCapitalize="none"
+              autoComplete="email"
+              keyboardType="email-address"
+              textContentType="emailAddress"
+              onSubmitEditing={() => email.trim() && handleSend()}
+            />
+          </View>
+        </View>
 
-      <Button
-        disabled={!email.trim() || loading}
-        loading={loading}
-        onPress={send}
-      >
-        Send reset link
-      </Button>
-    </AuthScreen>
+        {/* Submit Button */}
+        <Button
+          loading={loading}
+          disabled={!email.trim() || loading}
+          onPress={handleSend}
+          style={{ height: 44, borderRadius: 8, marginTop: 4 }}
+        >
+          Send reset instructions
+        </Button>
+      </View>
+    </AuthCardContainer>
   );
 }

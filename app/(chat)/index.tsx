@@ -122,9 +122,18 @@ export default function MobileChatScreen() {
     setShowContactInfo(false);
   }, [activeConversationId]);
 
+  const profileName =
+    profile?.display_name ||
+    profile?.name ||
+    user?.user_metadata?.display_name ||
+    user?.user_metadata?.full_name ||
+    user?.phone ||
+    user?.email?.split('@')[0] ||
+    'User';
+  const userEmail = profile?.email || user?.email || user?.phone || '';
   const userInitials = useMemo(() => {
-    if (profile?.name) {
-      return profile.name
+    if (profileName && profileName !== 'User') {
+      return profileName
         .split(' ')
         .filter(Boolean)
         .map((n: string) => n[0])
@@ -132,11 +141,11 @@ export default function MobileChatScreen() {
         .substring(0, 2)
         .toUpperCase();
     }
-    if (user?.email) {
-      return user.email.substring(0, 2).toUpperCase();
+    if (userEmail) {
+      return userEmail.substring(0, 2).toUpperCase();
     }
-    return 'MA';
-  }, [profile?.name, user?.email]);
+    return 'U';
+  }, [profileName, userEmail]);
 
   const activeDrawerItem = useMemo(() => {
     return (
@@ -1198,7 +1207,7 @@ export default function MobileChatScreen() {
         }}
         workspaceName="Amoga App"
         workspaceSubtitle="Workspace"
-        userName={profile?.name || user?.email?.split('@')[0] || 'Mohammed Aman'}
+        userName={profileName}
         userSubtitle="My Account"
         userInitials={userInitials}
         onProfilePress={() => setIsProfileModalOpen(true)}

@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/lib/database.types';
+import { LocalChatService } from '@/lib/local-db';
 
 interface AuthContextType {
   /** `null` once resolved and signed out; the session while signed in. */
@@ -189,9 +190,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    if (userId) {
+      await LocalChatService.clearUserCache(userId).catch(() => {});
+    }
     await supabase.auth.signOut();
     setProfile(null);
-  }, []);
+  }, [userId]);
 
   const refreshProfile = useCallback(async () => {
     if (userId) await loadProfile(userId);

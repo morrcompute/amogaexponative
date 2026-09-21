@@ -129,7 +129,7 @@ export function useChat() {
           other_member_json: c.otherMember ? JSON.stringify(c.otherMember) : null,
           members_count: c.membersCount || 2,
         }));
-        await LocalChatService.saveConversations(toCache);
+        await LocalChatService.saveConversations(toCache, user.id);
       }
     } catch (err) {
       console.warn('Offline / Network error fetching remote conversations, using local cache:', err);
@@ -139,8 +139,14 @@ export function useChat() {
   }, [user]);
 
   useEffect(() => {
+    if (!user) {
+      setConversations([]);
+      setMessages([]);
+      setActiveConversationId(null);
+      return;
+    }
     loadConversations();
-  }, [loadConversations]);
+  }, [user, loadConversations]);
 
   // 2. Load messages when active conversation changes (offline local first, then sync)
   const loadMessages = useCallback(

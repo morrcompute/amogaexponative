@@ -119,10 +119,17 @@ export default function ChatWebScreen() {
     setShowContactInfo(false);
   }, [activeConversationId]);
 
-  const profileName = profile?.name;
-  const userEmail = user?.email;
+  const profileName =
+    profile?.display_name ||
+    profile?.name ||
+    user?.user_metadata?.display_name ||
+    user?.user_metadata?.full_name ||
+    user?.phone ||
+    user?.email?.split('@')[0] ||
+    'User';
+  const userEmail = profile?.email || user?.email || user?.phone || '';
   const userInitials = useMemo(() => {
-    if (profileName) {
+    if (profileName && profileName !== 'User') {
       return profileName
         .split(' ')
         .filter(Boolean)
@@ -134,12 +141,12 @@ export default function ChatWebScreen() {
     if (userEmail) {
       return userEmail.substring(0, 2).toUpperCase();
     }
-    return 'MA';
+    return 'U';
   }, [profileName, userEmail]);
 
   const myProfileConversation = useMemo(() => {
-    const name = profile?.name || user?.user_metadata?.full_name || (user?.email ? user.email.split('@')[0] : 'Aman');
-    const email = user?.email || profile?.email || 'itsaman00786@gmail.com';
+    const name = profileName;
+    const email = userEmail;
     return {
       id: 'my-profile',
       title: name,
@@ -157,7 +164,7 @@ export default function ChatWebScreen() {
       created_at: '',
       updated_at: '',
     };
-  }, [profile, user]);
+  }, [profileName, userEmail, user]);
 
   const activeNavItem = useMemo(() => {
     return (
@@ -512,7 +519,7 @@ export default function ChatWebScreen() {
           activeId={mainNavId}
           onSelect={setMainNavId}
           userInitials={userInitials}
-          userName={profile?.name || user?.email?.split('@')[0] || 'Mohammed Aman'}
+          userName={profileName}
           userSubtitle="Account"
           onProfilePress={() => {
             setIsPreferencesOpen(false);
@@ -581,7 +588,7 @@ export default function ChatWebScreen() {
           }}
           workspaceName="Amoga App"
           workspaceSubtitle="Workspace"
-          userName={profile?.name || user?.email?.split('@')[0] || 'Mohammed Aman'}
+          userName={profileName}
           userSubtitle="My Account"
           userInitials={userInitials}
           onProfilePress={() => {

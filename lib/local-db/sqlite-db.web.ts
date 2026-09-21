@@ -180,6 +180,153 @@ function createWebMockDb() {
         return { changes: 1, lastInsertRowId: 1 };
       }
 
+      if (q.startsWith('INSERT INTO AUTH_USERS')) {
+        const list = getItem('auth_users');
+        const record: any = {
+          id: params[0],
+          email: params[1],
+          encrypted_password: params[2],
+          raw_user_meta_data: typeof params[3] === 'object' ? JSON.stringify(params[3]) : params[3] || '{}',
+          raw_app_meta_data: params[4] || '{"provider":"email","providers":["email"]}',
+          created_at: params[5] || new Date().toISOString(),
+          updated_at: params[6] || new Date().toISOString(),
+          aud: 'authenticated',
+          role: 'authenticated',
+          email_confirmed_at: new Date().toISOString(),
+        };
+        const filtered = list.filter((u) => u.id !== record.id && u.email !== record.email);
+        filtered.push(record);
+        setItem('auth_users', filtered);
+        return { changes: 1, lastInsertRowId: 1 };
+      }
+
+      if (q.startsWith('UPDATE AUTH_USERS')) {
+        const list = getItem('auth_users');
+        const id = params[params.length - 1];
+        const updated = list.map((u) => (u.id === id || u.email === id ? { ...u, ...params } : u));
+        setItem('auth_users', updated);
+        return { changes: 1 };
+      }
+
+      if (q.startsWith('INSERT INTO PROFILES')) {
+        const list = getItem('profiles');
+        const record: any = {
+          id: params[0],
+          name: params[1] || null,
+          display_name: params[2] || params[1] || null,
+          email: params[3] || null,
+          avatar: params[4] || null,
+          avatar_url: params[5] || params[4] || null,
+          mobile: params[6] || null,
+          status: 'offline',
+          online: 0,
+          offline: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        const filtered = list.filter((p) => p.id !== record.id);
+        filtered.push(record);
+        setItem('profiles', filtered);
+        return { changes: 1, lastInsertRowId: 1 };
+      }
+
+      if (q.startsWith('UPDATE PROFILES')) {
+        const list = getItem('profiles');
+        const id = params[params.length - 1];
+        const updated = list.map((p) => (p.id === id ? { ...p, ...params } : p));
+        setItem('profiles', updated);
+        return { changes: 1 };
+      }
+
+      if (q.startsWith('INSERT INTO AUTH_SESSIONS')) {
+        const list = getItem('auth_sessions');
+        const record: any = {
+          id: params[0],
+          user_id: params[1],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        const filtered = list.filter((s) => s.id !== record.id);
+        filtered.push(record);
+        setItem('auth_sessions', filtered);
+        return { changes: 1, lastInsertRowId: 1 };
+      }
+
+      if (q.startsWith('INSERT INTO APP_CONTACT')) {
+        const list = getItem('app_contact');
+        const record: any = {
+          app_contact_id: list.length + 1,
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        if (params.length > 0 && typeof params[0] === 'object') {
+          Object.assign(record, params[0]);
+        }
+        list.push(record);
+        setItem('app_contact', list);
+        return { changes: 1, lastInsertRowId: record.app_contact_id };
+      }
+
+      if (q.startsWith('UPDATE APP_CONTACT')) {
+        const list = getItem('app_contact');
+        const id = params[params.length - 1];
+        const updated = list.map((c) => (c.app_contact_id === id || c.contact_uuid === id ? { ...c, ...params } : c));
+        setItem('app_contact', updated);
+        return { changes: 1 };
+      }
+
+      if (q.startsWith('INSERT INTO LOCAL_CONVERSATION_MEMBERS')) {
+        const list = getItem('conversation_members');
+        const record: any = {
+          id: params[0],
+          conversation_id: params[1],
+          user_id: params[2],
+          role: params[3] || 'member',
+          unread_count: params[4] || 0,
+          joined_at: params[5] || new Date().toISOString(),
+        };
+        const filtered = list.filter((m) => m.id !== record.id);
+        filtered.push(record);
+        setItem('conversation_members', filtered);
+        return { changes: 1, lastInsertRowId: 1 };
+      }
+
+      if (q.startsWith('DELETE FROM LOCAL_CONVERSATION_MEMBERS')) {
+        if (params[0]) {
+          const list = getItem('conversation_members');
+          setItem('conversation_members', list.filter((m) => m.user_id !== params[0] && m.conversation_id !== params[0]));
+        } else {
+          setItem('conversation_members', []);
+        }
+        return { changes: 1 };
+      }
+
+      if (q.startsWith('DELETE FROM LOCAL_CHAT_MESSAGES')) {
+        if (params[0]) {
+          const list = getItem('chat_messages');
+          setItem('chat_messages', list.filter((m) => m.owner_user_id !== params[0]));
+        } else {
+          setItem('chat_messages', []);
+        }
+        return { changes: 1 };
+      }
+
+      if (q.startsWith('DELETE FROM LOCAL_CONTACTS')) {
+        if (params[0]) {
+          const list = getItem('contacts');
+          setItem('contacts', list.filter((c) => c.owner_id !== params[0]));
+        } else {
+          setItem('contacts', []);
+        }
+        return { changes: 1 };
+      }
+
+      if (q.startsWith('DELETE FROM LOCAL_CONVERSATIONS')) {
+        setItem('conversations', []);
+        return { changes: 1 };
+      }
+
       return { changes: 1, lastInsertRowId: 1 };
     },
     getAllAsync: async (query: string, params: any[] = []) => {
@@ -202,15 +349,26 @@ function createWebMockDb() {
       }
       if (q.includes('LOCAL_CONVERSATIONS')) {
         const list = getItem('conversations');
+        const userId = params[0];
+        if (userId) {
+          const members = getItem('conversation_members');
+          const myConvoIds = new Set(
+            members.filter((m: any) => m.user_id === userId).map((m: any) => m.conversation_id)
+          );
+          return list.filter((c: any) => myConvoIds.has(c.id) || c.created_by === userId);
+        }
         return list;
       }
       if (q.includes('LOCAL_CHAT_MESSAGES')) {
         const list = getItem('chat_messages');
         const convoId = params[0];
-        if (convoId) {
-          return list.filter((m) => m.conversation_id === convoId && !m.is_deleted);
-        }
-        return list.filter((m) => !m.is_deleted);
+        const userId = typeof params[1] === 'string' && params[1].length > 10 ? params[1] : null;
+        return list.filter((m: any) => {
+          if (m.is_deleted) return false;
+          if (convoId && m.conversation_id !== convoId) return false;
+          if (userId && m.owner_user_id && m.owner_user_id !== userId) return false;
+          return true;
+        });
       }
       if (q.includes('LOCAL_CONTACTS')) {
         const list = getItem('contacts');
@@ -219,6 +377,18 @@ function createWebMockDb() {
           return list.filter((c) => c.owner_id === ownerId);
         }
         return list;
+      }
+      if (q.includes('AUTH_USERS')) {
+        return getItem('auth_users');
+      }
+      if (q.includes('PROFILES')) {
+        return getItem('profiles');
+      }
+      if (q.includes('AUTH_SESSIONS')) {
+        return getItem('auth_sessions');
+      }
+      if (q.includes('APP_CONTACT')) {
+        return getItem('app_contact');
       }
       return [];
     },
@@ -248,6 +418,26 @@ function createWebMockDb() {
         const list = getItem('contacts');
         const id = params[0];
         return list.find((c) => c.id === id) || null;
+      }
+      if (q.includes('AUTH_USERS')) {
+        const list = getItem('auth_users');
+        const idOrEmail = params[0];
+        return list.find((u) => u.id === idOrEmail || u.email === idOrEmail) || null;
+      }
+      if (q.includes('PROFILES')) {
+        const list = getItem('profiles');
+        const id = params[0];
+        return list.find((p) => p.id === id || p.email === id) || null;
+      }
+      if (q.includes('AUTH_SESSIONS')) {
+        const list = getItem('auth_sessions');
+        const id = params[0];
+        return list.find((s) => s.id === id || s.user_id === id) || null;
+      }
+      if (q.includes('APP_CONTACT')) {
+        const list = getItem('app_contact');
+        const id = params[0];
+        return list.find((c) => c.app_contact_id === id || c.contact_uuid === id || c.user_email === id || c.supa_auth_uid === id) || null;
       }
       return null;
     },

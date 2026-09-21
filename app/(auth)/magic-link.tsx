@@ -1,91 +1,161 @@
+import React, { useState } from 'react';
 import {
-  Button,
-  Input,
+  Platform,
   Text,
-  useToast,
-  AuthScreen,
-} from 'amogamobileds-v1';
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { Mail } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { Button, useColorScheme, useColorTheme, useToast } from 'amogamobileds-v1';
 import { supabase } from '@/lib/supabase';
 import { makeRedirectUri } from 'expo-auth-session';
-import { router } from 'expo-router';
-import { Mail } from 'lucide-react-native';
-import { useState } from 'react';
+import {
+  AuthCardContainer,
+  AuthBanner,
+} from '@/components/auth/auth-card-container';
 
 const redirectTo = makeRedirectUri();
 
-/**
- * Passwordless sign-in.
- *
- * One `signInWithOtp` call sends both a clickable link and a six-digit code —
- * which one the user gets depends on your email template. The link comes back
- * through the deep-link handler in providers/auth-provider.tsx; the code is
- * entered on `/verify-otp`. Offering both is what makes this work when the mail
- * app opens the link in a browser that cannot reach the app.
- */
 export default function MagicLinkScreen() {
-  const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
+  const isDark = useColorScheme() === 'dark';
+  const { currentTheme } = useColorTheme();
   const toast = useToast();
 
-  const send = async () => {
+  const accent = isDark
+    ? currentTheme?.name && currentTheme.name !== 'zinc' && currentTheme.preview
+      ? currentTheme.preview
+      : '#818cf8'
+    : currentTheme?.name && currentTheme.name !== 'zinc'
+    ? currentTheme.preview
+    : '#18181b';
+
+  const border = isDark ? '#232734' : '#e2e8f0';
+  const text = isDark ? '#f8fafc' : '#0f172a';
+  const muted = isDark ? '#94a3b8' : '#64748b';
+  const inputBg = isDark ? '#0c0f17' : '#f8fafc';
+
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [banner, setBanner] = useState<AuthBanner | null>(null);
+
+  const handleSend = async () => {
     const address = email.trim();
-    setLoading(true);
-
-    const { error } = await supabase.auth.signInWithOtp({
-      email: address,
-      options: {
-        emailRedirectTo: redirectTo,
-        // Off, so this screen cannot be used to create accounts by accident.
-        // Turn it on if you want magic links to double as sign-up.
-        shouldCreateUser: false,
-      },
-    });
-
-    setLoading(false);
-
-    if (error) {
-      toast.error('Could not send the link', error.message);
+    if (!address) {
+      setBanner({ type: 'error', message: 'Please enter your email address.' });
       return;
     }
 
-    router.push({ pathname: '/verify-otp', params: { email: address } });
+    setLoading(true);
+    setBanner(null);
+
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: address,
+        options: {
+          emailRedirectTo: redirectTo,
+          shouldCreateUser: false,
+        },
+      });
+
+      if (error) throw error;
+
+      setBanner({
+        type: 'success',
+        message: `Magic link dispatched to ${address}! Check your inbox.`,
+      });
+      toast.success('Link sent', 'Check your inbox to sign in.');
+
+      setTimeout(() => {
+        router.push({ pathname: '/verify-otp', params: { email: address } });
+      }, 1500);
+    } catch (err: any) {
+      const msg = err.message || 'Could not send magic link.';
+      setBanner({ type: 'error', message: msg });
+      toast.error('Failed to send link', msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <AuthScreen
-      title='Sign in with email'
-      subtitle='We will send you a link and a code. Either one works.'
+    <AuthCardContainer
+      icon={Mail}
+      iconBg={accent + '20'}
+      iconColor={accent}
+      title="Sign in with email"
+      subtitle="We will send you a secure one-click link and a verification code."
+      banner={banner}
       footer={
-        <Button variant='ghost' onPress={() => router.back()}>
-          Use a password instead
-        </Button>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => router.replace('/sign-in')}
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingVertical: 8,
+          }}
+        >
+          <Text style={{ fontSize: 13, fontWeight: '600', color: accent }}>
+            ← Use password instead
+          </Text>
+        </TouchableOpacity>
       }
     >
-      <Input
-        label='Email'
-        icon={Mail}
-        placeholder='you@example.com'
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize='none'
-        autoComplete='email'
-        keyboardType='email-address'
-        textContentType='emailAddress'
-        onSubmitEditing={() => email.trim() && send()}
-      />
+      <View style={{ gap: 14 }}>
+        <View style={{ gap: 5 }}>
+          <Text style={{ fontSize: 12, fontWeight: '600', color: text }}>
+            Email address
+          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              height: 42,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: border,
+              backgroundColor: inputBg,
+              paddingHorizontal: 12,
+              gap: 8,
+            }}
+          >
+            <Mail size={16} color="#94a3b8" />
+            <TextInput
+              style={{
+                flex: 1,
+                fontSize: 13.5,
+                color: text,
+                padding: 0,
+                ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}),
+              }}
+              value={email}
+              onChangeText={(val) => {
+                setEmail(val);
+                if (banner) setBanner(null);
+              }}
+              placeholder="you@example.com"
+              placeholderTextColor="#94a3b8"
+              autoCapitalize="none"
+              autoComplete="email"
+              keyboardType="email-address"
+              textContentType="emailAddress"
+              onSubmitEditing={() => email.trim() && handleSend()}
+            />
+          </View>
+        </View>
 
-      <Button
-        disabled={!email.trim() || loading}
-        loading={loading}
-        onPress={send}
-      >
-        Send me a link
-      </Button>
-
-      <Text variant='caption'>
-        Only works for an address that already has an account. Sign up first if
-        you do not.
-      </Text>
-    </AuthScreen>
+        <Button
+          loading={loading}
+          disabled={!email.trim() || loading}
+          onPress={handleSend}
+          style={{ height: 42, borderRadius: 8, marginTop: 4 }}
+        >
+          Send magic link
+        </Button>
+      </View>
+    </AuthCardContainer>
   );
 }

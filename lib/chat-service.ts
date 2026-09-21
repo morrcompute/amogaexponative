@@ -538,16 +538,18 @@ export async function getOrCreateDirectConversation(
         .in('conversation_id', convoIds);
 
       if (targetMemberships && targetMemberships.length > 0) {
-        // Verify it's a direct conversation
-        const matchedConvoId = targetMemberships[0].conversation_id;
-        const { data: convo } = await supabase
+        // Query all matching shared conversations to find if any is a direct conversation
+        const sharedConvoIds = targetMemberships.map((t) => t.conversation_id);
+        const { data: convos } = await supabase
           .from('conversations')
           .select('id, type')
-          .eq('id', matchedConvoId)
+          .in('id', sharedConvoIds)
           .eq('type', 'direct')
-          .maybeSingle();
+          .limit(1);
 
-        if (convo) return convo.id;
+        if (convos && convos.length > 0) {
+          return convos[0].id;
+        }
       }
     }
 

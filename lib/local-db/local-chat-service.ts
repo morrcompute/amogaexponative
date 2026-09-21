@@ -7,9 +7,9 @@ import type {
 
 export class LocalChatService {
   /**
-   * Save or update a single conversation in local database
+   * Save or update a single conversation in local database and register membership for current user
    */
-  static async saveConversation(convo: LocalConversationRecord): Promise<void> {
+  static async saveConversation(convo: LocalConversationRecord, currentUserId?: string): Promise<void> {
     const db = await getLocalDatabase();
     const now = new Date().toISOString();
 
@@ -46,25 +46,61 @@ export class LocalChatService {
         convo.members_count || 2,
       ]
     );
-  }
 
-  /**
-   * Bulk save conversations from Supabase / Remote sync
-   */
-  static async saveConversations(convos: LocalConversationRecord[]): Promise<void> {
-    for (const c of convos) {
-      await this.saveConversation(c);
+    // If currentUserId is specified, link membership locally to isolate user chat views
+    if (currentUserId) {
+      await db.runAsync(
+        `
+        INSERT INTO local_conversation_members (
+          id, conversation_id, user_id, role, unread_count, joined_at
+        ) VALUES (?, ?, ?, 'member', ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          unread_count = excluded.unread_count
+      `,
+        [
+          `${convo.id}_${currentUserId}`,
+          convo.id,
+          currentUserId,
+          convo.unread_count || 0,
+          now,
+        ]
+      );
     }
   }
 
   /**
-   * Fetch all cached local conversations sorted by latest activity
+   * Bulk save conversations from Supabase / Remote sync for a specific user
    */
-  static async getConversations(_userId?: string): Promise<LocalConversationRecord[]> {
+  static async saveConversations(convos: LocalConversationRecord[], currentUserId?: string): Promise<void> {
+    for (const c of convos) {
+      await this.saveConversation(c, currentUserId);
+    }
+  }
+
+  /**
+   * Fetch all cached local conversations for a specific user sorted by latest activity.
+   * If userId is provided, strictly filters by conversation membership so other users on the device cannot see them.
+   */
+  static async getConversations(userId?: string): Promise<LocalConversationRecord[]> {
     const db = await getLocalDatabase();
-    const rows = await db.getAllAsync(
-      `SELECT * FROM local_conversations ORDER BY updated_at DESC`
-    );
+    let rows: any[] = [];
+    if (userId) {
+      rows = await db.getAllAsync(
+        `
+        SELECT DISTINCT c.*
+        FROM local_conversations c
+        JOIN local_conversation_members m ON c.id = m.conversation_id
+        WHERE m.user_id = ?
+        ORDER BY c.updated_at DESC
+      `,
+        [userId]
+      );
+    } else {
+      rows = await db.getAllAsync(
+        `SELECT * FROM local_conversations ORDER BY updated_at DESC`
+      );
+    }
+
     return (rows || []).map((row: any) => ({
       ...row,
       unread_count: Number(row.unread_count || 0),
@@ -184,22 +220,36 @@ export class LocalChatService {
 
   /**
    * Fetch conversation messages sorted chronologically (created_at ASC)
+   * If userId is provided, strictly filters by owner_user_id so User A only sees their copy.
    */
   static async getMessages(
     conversationId: string,
-    _userId?: string,
+    userId?: string,
     limit: number = 100
   ): Promise<LocalChatMessageRecord[]> {
     const db = await getLocalDatabase();
-    const rows = await db.getAllAsync(
-      `
-      SELECT * FROM local_chat_messages
-      WHERE conversation_id = ? AND is_deleted = 0
-      ORDER BY created_at ASC
-      LIMIT ?
-    `,
-      [conversationId, limit]
-    );
+    let rows: any[] = [];
+    if (userId) {
+      rows = await db.getAllAsync(
+        `
+        SELECT * FROM local_chat_messages
+        WHERE conversation_id = ? AND owner_user_id = ? AND is_deleted = 0
+        ORDER BY created_at ASC
+        LIMIT ?
+      `,
+        [conversationId, userId, limit]
+      );
+    } else {
+      rows = await db.getAllAsync(
+        `
+        SELECT * FROM local_chat_messages
+        WHERE conversation_id = ? AND is_deleted = 0
+        ORDER BY created_at ASC
+        LIMIT ?
+      `,
+        [conversationId, limit]
+      );
+    }
 
     return (rows || []).map((row: any) => ({
       ...row,
@@ -284,6 +334,15 @@ export class LocalChatService {
   }
 
   /**
+   * Bulk save local contacts
+   */
+  static async saveContacts(contacts: LocalContactRecord[]): Promise<void> {
+    for (const c of contacts) {
+      await this.saveContact(c);
+    }
+  }
+
+  /**
    * Get all local contacts for a user
    */
   static async getContacts(ownerId: string): Promise<LocalContactRecord[]> {
@@ -293,5 +352,43 @@ export class LocalChatService {
       [ownerId]
     );
     return rows || [];
+  }
+
+  /**
+   * Clear all local cache data for a specific user upon sign-out
+   */
+  static async clearUserCache(userId: string): Promise<void> {
+    try {
+      const db = await getLocalDatabase();
+      await db.runAsync(
+        `DELETE FROM local_conversation_members WHERE user_id = ?`,
+        [userId]
+      );
+      await db.runAsync(
+        `DELETE FROM local_chat_messages WHERE owner_user_id = ?`,
+        [userId]
+      );
+      await db.runAsync(
+        `DELETE FROM local_contacts WHERE owner_id = ?`,
+        [userId]
+      );
+    } catch (err) {
+      console.warn('Could not clear local user cache:', err);
+    }
+  }
+
+  /**
+   * Clear all local tables completely
+   */
+  static async clearAllCache(): Promise<void> {
+    try {
+      const db = await getLocalDatabase();
+      await db.runAsync(`DELETE FROM local_conversations`);
+      await db.runAsync(`DELETE FROM local_conversation_members`);
+      await db.runAsync(`DELETE FROM local_chat_messages`);
+      await db.runAsync(`DELETE FROM local_contacts`);
+    } catch (err) {
+      console.warn('Could not clear all local cache:', err);
+    }
   }
 }
