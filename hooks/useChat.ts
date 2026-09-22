@@ -103,31 +103,48 @@ export function useChat() {
     try {
       const localList = await LocalChatService.getConversations(user.id);
       if (localList && localList.length > 0) {
-        const mapped: EnrichedConversation[] = localList.map((c) => ({
-          id: c.id,
-          type: c.type,
-          name: c.name || null,
-          image: c.image || null,
-          created_by: c.created_by || null,
-          created_at: c.created_at || new Date().toISOString(),
-          unreadCount: c.unread_count || 0,
-          otherMember: c.other_member_json ? JSON.parse(c.other_member_json) : null,
-          lastMessage: c.last_message_text
-            ? ({
-                id: `local-last-${c.id}`,
-                conversation_id: c.id,
-                owner_user_id: user.id,
-                sender_user_id: user.id,
-                message: c.last_message_text,
-                created_at: c.last_message_time || c.updated_at || new Date().toISOString(),
-                direction: 'Sent',
-                sent: true,
-                received: false,
-                message_type: 'text',
-              } as any)
-            : null,
-          membersCount: c.members_count || 2,
-        }));
+        const mapped: EnrichedConversation[] = localList.map((c) => {
+          let otherMember: Profile | null = null;
+          let members: Profile[] = [];
+          if (c.other_member_json) {
+            try {
+              const parsed = JSON.parse(c.other_member_json);
+              if (c.type === 'group' || Array.isArray(parsed)) {
+                members = Array.isArray(parsed) ? parsed : [];
+              } else {
+                otherMember = parsed;
+              }
+            } catch (e) {
+              // ignore json parse error
+            }
+          }
+          return {
+            id: c.id,
+            type: c.type,
+            name: c.name || null,
+            image: c.image || null,
+            created_by: c.created_by || null,
+            created_at: c.created_at || new Date().toISOString(),
+            unreadCount: c.unread_count || 0,
+            otherMember,
+            members,
+            lastMessage: c.last_message_text
+              ? ({
+                  id: `local-last-${c.id}`,
+                  conversation_id: c.id,
+                  owner_user_id: user.id,
+                  sender_user_id: user.id,
+                  message: c.last_message_text,
+                  created_at: c.last_message_time || c.updated_at || new Date().toISOString(),
+                  direction: 'Sent',
+                  sent: true,
+                  received: false,
+                  message_type: 'text',
+                } as any)
+              : null,
+            membersCount: c.members_count || (members.length > 0 ? members.length : 2),
+          };
+        });
         setConversations(mapped);
         setLoadingConversations(false);
       }
@@ -151,8 +168,13 @@ export function useChat() {
           unread_count: c.unreadCount || 0,
           last_message_text: c.lastMessage?.message || null,
           last_message_time: c.lastMessage?.created_at || c.created_at,
-          other_member_json: c.otherMember ? JSON.stringify(c.otherMember) : null,
-          members_count: c.membersCount || 2,
+          other_member_json:
+            c.type === 'group' && c.members && c.members.length > 0
+              ? JSON.stringify(c.members)
+              : c.otherMember
+              ? JSON.stringify(c.otherMember)
+              : null,
+          members_count: c.membersCount || (c.members?.length ?? 2),
         }));
         await LocalChatService.saveConversations(toCache, user.id);
       }

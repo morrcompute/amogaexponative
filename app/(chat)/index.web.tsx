@@ -1011,10 +1011,44 @@ export default function ChatWebScreen() {
                       />
                     ) : (
                       messages.map((msg) => {
-                        const isOwn = msg.owner_user_id === user?.id && msg.direction === 'Sent';
-                        const senderName = isOwn
-                          ? profile?.name || 'Mohammed Aman'
-                          : activeConversation?.otherMember?.name || 'Aman';
+                        const isOwn = (msg.owner_user_id === user?.id && msg.direction === 'Sent') || msg.sender_user_id === user?.id;
+
+                        const resolveSenderName = (): string => {
+                          if (isOwn) {
+                            return profile?.name || profile?.display_name || user?.email?.split('@')[0] || 'You';
+                          }
+
+                          const senderId = msg.sender_user_id;
+
+                          // 1. In a group conversation, search through activeConversation.members
+                          if (activeConversation?.members && activeConversation.members.length > 0 && senderId) {
+                            const member = activeConversation.members.find((m) => m.id === senderId);
+                            if (member) {
+                              const name = member.name || member.display_name || member.email?.split('@')[0] || member.mobile;
+                              if (name) return name;
+                            }
+                          }
+
+                          // 2. Check user's saved contacts
+                          if (contacts && contacts.length > 0 && senderId) {
+                            const contact = contacts.find((c) => c.id === senderId);
+                            if (contact?.name) return contact.name;
+                          }
+
+                          // 3. If direct conversation, use the other member's profile
+                          if (activeConversation?.otherMember) {
+                            const otherName =
+                              activeConversation.otherMember.name ||
+                              activeConversation.otherMember.display_name ||
+                              activeConversation.otherMember.email?.split('@')[0] ||
+                              activeConversation.otherMember.mobile;
+                            if (otherName) return otherName;
+                          }
+
+                          return 'Member';
+                        };
+
+                        const senderName = resolveSenderName();
 
                         let locationData: { latitude: number; longitude: number; address?: string; title?: string } | undefined = undefined;
                         if (msg.message_type === 'location' && msg.file_url) {
@@ -1049,10 +1083,27 @@ export default function ChatWebScreen() {
                           ? (repliedMsg.sender_user_id === user?.id || (('owner_user_id' in repliedMsg) && (repliedMsg as any).owner_user_id === user?.id && (repliedMsg as any).direction === 'Sent'))
                           : false;
 
+                        const resolveRepliedSenderName = (): string => {
+                          if (isRepliedOwn) return 'You';
+                          const rSenderId = repliedMsg?.sender_user_id;
+                          if (activeConversation?.members && activeConversation.members.length > 0 && rSenderId) {
+                            const member = activeConversation.members.find((m) => m.id === rSenderId);
+                            if (member) {
+                              const name = member.name || member.display_name || member.email?.split('@')[0] || member.mobile;
+                              if (name) return name;
+                            }
+                          }
+                          if (contacts && contacts.length > 0 && rSenderId) {
+                            const contact = contacts.find((c) => c.id === rSenderId);
+                            if (contact?.name) return contact.name;
+                          }
+                          return activeConversation?.otherMember?.name || activeConversation?.otherMember?.display_name || activeConversation?.otherMember?.email?.split('@')[0] || 'Contact';
+                        };
+
                         const replyPreviewData = repliedMsg
                           ? {
                               id: targetReplyId || undefined,
-                              senderName: isRepliedOwn ? 'You' : (activeConversation?.otherMember?.name || activeConversation?.otherMember?.email?.split('@')[0] || 'Contact'),
+                              senderName: resolveRepliedSenderName(),
                               content:
                                 repliedMsg.message ||
                                 repliedMsg.file_name ||
