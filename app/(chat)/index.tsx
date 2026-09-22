@@ -88,6 +88,8 @@ export default function MobileChatScreen() {
     handleForwardMessage,
     startDirectChat,
     startGroupChat,
+    addMemberToGroup,
+    removeMemberFromGroup,
     loadConversations,
     isOtherTyping,
     sendTypingStatus,
@@ -978,6 +980,27 @@ export default function MobileChatScreen() {
                   />
                 </View>
               </Pressable>
+            </Modal>
+
+            {/* Contact / Group Info View Modal */}
+            <Modal
+              visible={showContactInfo}
+              animationType="slide"
+              onRequestClose={() => setShowContactInfo(false)}
+            >
+              <ContactInfoView
+                conversation={activeConversation}
+                messages={messages}
+                currentUserId={user?.id}
+                contacts={contacts}
+                onAddMember={(uid) => {
+                  if (activeConversationId) return addMemberToGroup(activeConversationId, uid);
+                }}
+                onRemoveMember={(uid) => {
+                  if (activeConversationId) return removeMemberFromGroup(activeConversationId, uid);
+                }}
+                onClose={() => setShowContactInfo(false)}
+              />
             </Modal>
 
             {/* In-App Forward Message Picker Modal (Forward to ANY Chat) */}

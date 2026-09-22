@@ -1,11 +1,23 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from './supabase';
 import type {
   ChatMessage,
   Conversation,
   ConversationMember,
   Profile,
-} from '@/lib/database.types';
+} from './database.types';
 import { Platform } from 'react-native';
+
+const getFileSystemModule = () => {
+  try {
+    return require('expo-file-system/legacy');
+  } catch {
+    try {
+      return require('expo-file-system');
+    } catch {
+      return null;
+    }
+  }
+};
 
 export interface EnrichedConversation extends Conversation {
   otherMember?: Profile | null;
@@ -165,6 +177,7 @@ export async function sendMessage(params: {
   duration?: number;
   replyToMessageId?: string;
   replyToUserId?: string;
+  senderMessageId?: string;
 }): Promise<ChatMessage | null> {
   try {
     const {
@@ -179,6 +192,7 @@ export async function sendMessage(params: {
       duration,
       replyToMessageId,
       replyToUserId,
+      senderMessageId,
     } = params;
 
     // 1. Get all members in the conversation
@@ -198,6 +212,7 @@ export async function sendMessage(params: {
       conversation_id: conversationId,
       owner_user_id: senderId,
       sender_user_id: senderId,
+      sender_message_id: senderMessageId || null,
       message: messageText,
       message_type: messageType,
       direction: 'Sent' as const,
@@ -232,6 +247,7 @@ export async function sendMessage(params: {
         conversation_id: conversationId,
         owner_user_id: m.user_id,
         sender_user_id: senderId,
+        sender_message_id: senderMessageId || null,
         message: messageText,
         message_type: messageType,
         direction: 'Received' as const,
@@ -246,7 +262,6 @@ export async function sendMessage(params: {
         reply: !!replyToMessageId,
         replyto_message_id: replyToMessageId || null,
         replyto_user_id: replyToUserId || null,
-        sender_message_id: senderMessage.id,
       }));
 
       await supabase.from('chat_messages').insert(recipientCopies);
@@ -308,32 +323,22 @@ export async function uploadChatAttachment(
     if (Platform.OS !== 'web' && fileUri && (fileUri.startsWith('file:') || fileUri.startsWith('content:'))) {
       const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
       const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-      const FS: any = (() => {
-        try {
-          return require('expo-file-system/legacy');
-        } catch {
-          try {
-            return require('expo-file-system');
-          } catch {
-            return null;
-          }
-        }
-      })();
+      const FileSystem = getFileSystemModule();
 
-      if (supabaseUrl && supabaseKey && FS && FS.uploadAsync) {
+      if (FileSystem && supabaseUrl && supabaseKey) {
         try {
           const uploadEndpoint = `${supabaseUrl}/storage/v1/object/chat-files/${filePath}`;
-          const uploadRes = await FS.uploadAsync(uploadEndpoint, fileUri, {
+          const uploadRes = await FileSystem.uploadAsync(uploadEndpoint, fileUri, {
             headers: {
               Authorization: `Bearer ${supabaseKey}`,
               apikey: supabaseKey,
               'Content-Type': mimeType || 'application/octet-stream',
             },
             httpMethod: 'POST',
-            uploadType: FS.FileSystemUploadType?.BINARY_CONTENT ?? 0,
+            uploadType: FileSystem.FileSystemUploadType?.BINARY_CONTENT || 0,
           });
 
-          if (uploadRes.status >= 200 && uploadRes.status < 300) {
+          if (uploadRes && uploadRes.status >= 200 && uploadRes.status < 300) {
             const { data: urlData } = supabase.storage
               .from('chat-files')
               .getPublicUrl(filePath);
@@ -341,7 +346,7 @@ export async function uploadChatAttachment(
               console.log('[upload] Native FileSystem.uploadAsync success:', urlData.publicUrl);
               return urlData.publicUrl;
             }
-          } else {
+          } else if (uploadRes) {
             console.warn('[upload] Native FileSystem.uploadAsync response:', uploadRes.status, uploadRes.body);
           }
         } catch (nativeErr) {
@@ -350,10 +355,10 @@ export async function uploadChatAttachment(
       }
 
       // If uploadAsync wasn't successful, try reading file bytes into base64Data
-      if (!base64Data && FS && FS.readAsStringAsync) {
+      if (!base64Data && FileSystem) {
         try {
-          base64Data = await FS.readAsStringAsync(fileUri, {
-            encoding: FS.EncodingType?.Base64 || 'base64',
+          base64Data = await FileSystem.readAsStringAsync(fileUri, {
+            encoding: FileSystem.EncodingType?.Base64 || 'base64',
           });
         } catch (fsReadErr) {
           console.warn('[upload] FileSystem.readAsStringAsync error:', fsReadErr);
@@ -651,5 +656,116 @@ export async function searchProfiles(
   } catch (err) {
     console.error('Error in searchProfiles:', err);
     return [];
+  }
+}
+
+export interface ConversationMemberWithProfile {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  role: 'admin' | 'member' | string;
+  joined_at?: string;
+  profile?: {
+    id: string;
+    name?: string;
+    email?: string;
+    mobile?: string;
+    avatar?: string;
+    avatar_url?: string;
+    online?: boolean;
+    last_seen?: string;
+  };
+}
+
+/**
+ * Fetch all members of a conversation with their profiles.
+ */
+export async function getConversationMembers(
+  conversationId: string
+): Promise<ConversationMemberWithProfile[]> {
+  try {
+    const { data: members, error: memErr } = await supabase
+      .from('conversation_members')
+      .select('id, conversation_id, user_id, role, joined_at')
+      .eq('conversation_id', conversationId);
+
+    if (memErr || !members) {
+      console.error('Error fetching conversation members:', memErr);
+      return [];
+    }
+
+    const userIds = members.map((m) => m.user_id).filter(Boolean);
+    if (userIds.length === 0) return [];
+
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, name, email, mobile, avatar, avatar_url, online, last_seen')
+      .in('id', userIds);
+
+    const profileMap: Record<string, any> = {};
+    if (profiles) {
+      profiles.forEach((p) => {
+        profileMap[p.id] = p;
+      });
+    }
+
+    return members.map((m) => ({
+      ...m,
+      profile: profileMap[m.user_id] || { id: m.user_id, name: 'User' },
+    }));
+  } catch (err) {
+    console.error('Error in getConversationMembers:', err);
+    return [];
+  }
+}
+
+/**
+ * Add a member to a group conversation.
+ */
+export async function addConversationMember(
+  conversationId: string,
+  userId: string,
+  role: string = 'member'
+): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('conversation_members').insert({
+      conversation_id: conversationId,
+      user_id: userId,
+      role,
+    });
+
+    if (error) {
+      console.error('Error adding conversation member:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Error in addConversationMember:', err);
+    return false;
+  }
+}
+
+/**
+ * Remove a member from a group conversation.
+ */
+export async function removeConversationMember(
+  conversationId: string,
+  userId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('conversation_members')
+      .delete()
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error removing conversation member:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Error in removeConversationMember:', err);
+    return false;
   }
 }

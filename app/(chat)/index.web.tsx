@@ -76,6 +76,8 @@ export default function ChatWebScreen() {
     handleDeleteMessage,
     startDirectChat,
     startGroupChat,
+    addMemberToGroup,
+    removeMemberFromGroup,
     loadConversations,
     isOtherTyping,
     sendTypingStatus,
@@ -935,6 +937,10 @@ export default function ChatWebScreen() {
                   <ContactInfoView
                     conversation={activeConversation}
                     messages={messages}
+                    currentUserId={user?.id}
+                    contacts={contacts}
+                    onAddMember={(uid) => addMemberToGroup(activeConversationId, uid)}
+                    onRemoveMember={(uid) => removeMemberFromGroup(activeConversationId, uid)}
                     onClose={() => setShowContactInfo(false)}
                   />
                 ) : (
