@@ -268,24 +268,34 @@ export default function ChatWebScreen() {
     loadContacts();
   }, [loadContacts]);
 
-  // Add contact (by Mobile or Email)
+  // Add contact by Email (with optional mobile for display)
   const handleAddContact = async (newC: { name: string; mobile?: string; email?: string }) => {
     if (!user) return;
     const nameTrimmed = newC.name?.trim() || '';
-    const mobileTrimmed = newC.mobile?.trim() || '';
     const emailLower = newC.email?.trim().toLowerCase() || '';
+    const mobileTrimmed = newC.mobile?.trim() || '';
 
     if (!nameTrimmed) {
       toast.info('Please enter contact name');
       return;
     }
 
-    if (!mobileTrimmed && !emailLower) {
-      toast.info('Please enter a mobile number or email');
+    if (!emailLower) {
+      toast.info('Please enter an email address');
       return;
     }
 
-    const searchTerm = mobileTrimmed || emailLower;
+    if (user.email && user.email.toLowerCase() === emailLower) {
+      toast.info('You cannot add yourself as a contact');
+      return;
+    }
+
+    // Check if already in contact list
+    const isAlready = contacts.some((c) => c.email?.toLowerCase() === emailLower);
+    if (isAlready) {
+      toast.info('This contact is already in your list');
+      return;
+    }
 
     try {
       // 0. Ensure current user profile exists in profiles table
@@ -302,13 +312,11 @@ export default function ChatWebScreen() {
           user.user_metadata?.full_name ||
           user.user_metadata?.display_name ||
           user.email?.split('@')[0] ||
-          user.phone ||
           'User';
 
         await supabase.from('profiles').upsert({
           id: user.id,
           email: user.email || '',
-          mobile: user.phone || '',
           name: myName,
           online: true,
           offline: false,
@@ -316,52 +324,49 @@ export default function ChatWebScreen() {
         } as any);
       }
 
-      // 1. Search for existing user via find_user_by_contact_identifier RPC
-      let targetUserId: string | null = null;
-      try {
-        const { data: rpcUser } = await (supabase.rpc as any)('find_user_by_contact_identifier', {
-          search_term: searchTerm,
-        });
-        if (rpcUser && Array.isArray(rpcUser) && rpcUser.length > 0) {
-          targetUserId = rpcUser[0].id;
-        }
-      } catch (e) {
-        console.warn('RPC lookup failed, trying fallback query:', e);
-      }
+      // 1. Search for existing profile by email
+      const { data: existingProfiles } = await supabase
+        .from('profiles')
+        .select('id, name, email, mobile')
+        .ilike('email', emailLower)
+        .limit(1);
 
-      // Fallback: direct table query if RPC not found or returned empty
-      if (!targetUserId) {
-        if (mobileTrimmed) {
-          const cleanedDigits = mobileTrimmed.replace(/[^\d]/g, '');
-          const { data: profByMobile } = await supabase
+      let targetUserId: string;
+
+      if (existingProfiles && existingProfiles.length > 0) {
+        targetUserId = existingProfiles[0].id;
+      } else {
+        // User is not in DB yet - generate UUID and create stub profile
+        const newUserId =
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                const r = (Math.random() * 16) | 0;
+                const v = c === 'x' ? r : (r & 0x3) | 0x8;
+                return v.toString(16);
+              });
+
+        const displayName = nameTrimmed || emailLower.split('@')[0];
+        try {
+          const { data: newProfile } = await supabase
             .from('profiles')
-            .select('id')
-            .or(`mobile.eq.${mobileTrimmed},mobile.ilike.%${cleanedDigits.slice(-10)}%`)
-            .limit(1);
-          if (profByMobile && profByMobile.length > 0) {
-            targetUserId = profByMobile[0].id;
-          }
-        }
-        if (!targetUserId && emailLower) {
-          const { data: profByEmail } = await supabase
-            .from('profiles')
-            .select('id')
-            .ilike('email', emailLower)
-            .limit(1);
-          if (profByEmail && profByEmail.length > 0) {
-            targetUserId = profByEmail[0].id;
-          }
-        }
-      }
+            .insert({
+              id: newUserId,
+              email: emailLower,
+              name: displayName,
+              mobile: mobileTrimmed || null,
+              online: false,
+              offline: true,
+              updated_at: new Date().toISOString(),
+            } as any)
+            .select()
+            .maybeSingle();
 
-      if (!targetUserId) {
-        toast.error('No registered user found with this mobile number or email.');
-        return;
-      }
-
-      if (targetUserId === user.id) {
-        toast.info('You cannot add yourself as a contact');
-        return;
+          targetUserId = newProfile?.id || newUserId;
+        } catch (profErr) {
+          console.warn('Profile stub insert note:', profErr);
+          targetUserId = newUserId;
+        }
       }
 
       // Check if contact record already exists
@@ -383,6 +388,9 @@ export default function ChatWebScreen() {
         owner_id: user.id,
         contact_user_id: targetUserId,
         nickname: nameTrimmed,
+        email: emailLower,
+        mobile: mobileTrimmed || null,
+        user_uuid: user.id,
       } as any);
 
       if (insertErr) {
