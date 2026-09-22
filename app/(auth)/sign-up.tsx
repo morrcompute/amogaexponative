@@ -1,14 +1,27 @@
 import React from 'react';
 import { SignupPageView } from 'amogamobileds-v1';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { saveLocalProfile } from '@/lib/local-db';
 import { supabase } from '@/lib/supabase';
 
 export default function SignUpScreen() {
+  const params = useLocalSearchParams<{ phone?: string; method?: 'email' | 'phone' }>();
+
   return (
     <SignupPageView
       supabaseClient={supabase}
-      onSignInPress={() => router.push('/(auth)/sign-in')}
+      initialMethod={params.method || (params.phone ? 'phone' : 'email')}
+      initialPhone={params.phone}
+      onSignInPress={(phone) => {
+        if (phone) {
+          router.push({
+            pathname: '/(auth)/sign-in',
+            params: { phone, method: 'phone' },
+          });
+        } else {
+          router.push('/(auth)/sign-in');
+        }
+      }}
       onSuccess={async (user, session) => {
         if (session) {
           await supabase.auth.setSession(session).catch(() => {});
