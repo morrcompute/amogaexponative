@@ -48,6 +48,21 @@ const getFileSystemModule = () => {
   }
 };
 
+const generateUUID = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    try {
+      return crypto.randomUUID();
+    } catch {
+      // fallback
+    }
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 export function useChat() {
   const { user, profile } = useAuth();
   const toast = useToast();
@@ -75,7 +90,13 @@ export function useChat() {
 
   // 1. Load user conversations (offline local first, then sync with Supabase)
   const loadConversations = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setConversations([]);
+      setMessages([]);
+      setActiveConversationId(null);
+      setLoadingConversations(false);
+      return;
+    }
     setLoadingConversations(true);
 
     // Step A: Load instantly from local storage (0ms offline latency)
@@ -143,19 +164,17 @@ export function useChat() {
   }, [user]);
 
   useEffect(() => {
-    if (!user) {
-      setConversations([]);
-      setMessages([]);
-      setActiveConversationId(null);
-      return;
-    }
     loadConversations();
-  }, [user, loadConversations]);
+  }, [loadConversations]);
 
   // 2. Load messages when active conversation changes (offline local first, then sync)
   const loadMessages = useCallback(
-    async (convoId: string) => {
-      if (!user) return;
+    async (convoId: string | null) => {
+      if (!convoId || !user) {
+        setMessages([]);
+        setLoadingMessages(false);
+        return;
+      }
       setLoadingMessages(true);
       // Immediately clear messages so previous conversation's messages don't bleed through
       setMessages([]);
@@ -202,9 +221,9 @@ export function useChat() {
             sender_message_id: m.sender_message_id,
           }));
           await LocalChatService.saveMessages(toCache);
-        } else if (msgs) {
-          // If remote returned empty array, ensure messages is empty
-          setMessages([]);
+        } else if (msgs && msgs.length === 0) {
+          // If remote returned empty array, preserve any actively sending/pending optimistic messages
+          setMessages((prev) => prev.filter((m) => (m as any).sync_status === 'pending'));
         }
       } catch (err) {
         console.warn('Offline / Network error fetching remote messages, using local cache:', err);
@@ -216,11 +235,7 @@ export function useChat() {
   );
 
   useEffect(() => {
-    if (activeConversationId) {
-      loadMessages(activeConversationId);
-    } else {
-      setMessages([]);
-    }
+    loadMessages(activeConversationId);
   }, [activeConversationId, loadMessages]);
 
   // 3. Realtime subscription for incoming messages to current user
@@ -263,14 +278,26 @@ export function useChat() {
               if (prev.some((m) => m.id === newMsg.id)) return prev;
 
               // 2. If matching sender_message_id with an optimistic local record, replace it
-              if (newMsg.sender_message_id && prev.some((m) => m.id === newMsg.sender_message_id)) {
-                return prev.map((m) => (m.id === newMsg.sender_message_id ? newMsg : m));
+              if (
+                newMsg.sender_message_id &&
+                prev.some(
+                  (m) =>
+                    m.id === newMsg.sender_message_id ||
+                    (m as any).sender_message_id === newMsg.sender_message_id
+                )
+              ) {
+                return prev.map((m) =>
+                  m.id === newMsg.sender_message_id ||
+                  (m as any).sender_message_id === newMsg.sender_message_id
+                    ? newMsg
+                    : m
+                );
               }
 
-              // 3. If sender is self and a pending optimistic local message matches, replace it
+              // 3. Fallback: If sender is self and a pending optimistic local message matches, replace it
               const pendingIdx = prev.findIndex(
                 (m) =>
-                  m.id?.startsWith('local-') &&
+                  (m as any).sync_status === 'pending' &&
                   m.sender_user_id === newMsg.sender_user_id &&
                   m.message === newMsg.message
               );
@@ -455,13 +482,14 @@ export function useChat() {
     setIsSending(true);
 
     const now = new Date().toISOString();
-    const tempId = `local-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    const tempId = generateUUID();
 
     const optimisticRecord: LocalChatMessageRecord = {
       id: tempId,
       conversation_id: activeConversationId,
       owner_user_id: user.id,
       sender_user_id: user.id,
+      sender_message_id: tempId,
       message: text,
       message_type: 'text',
       direction: 'Sent',
