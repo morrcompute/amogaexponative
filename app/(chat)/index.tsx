@@ -528,7 +528,7 @@ export default function MobileChatScreen() {
     );
   }, [contacts, otherMember, isDirect]);
 
-  const { startCall } = useCall();
+  const { startCall, startGroupCall } = useCall();
 
   const handleStartCall = useCallback(
     (type: 'audio' | 'video') => {
@@ -550,10 +550,11 @@ export default function MobileChatScreen() {
           type
         );
       } else {
-        toast.info('Group calling is coming soon.');
+        // Start Multi-Party Group Audio or Video Call
+        startGroupCall(activeConversation, type);
       }
     },
-    [activeConversation, startCall, toast]
+    [activeConversation, startCall, startGroupCall, toast]
   );
 
   const handleSelectChat = (id: string) => {

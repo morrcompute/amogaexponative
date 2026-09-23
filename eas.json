@@ -25,7 +25,11 @@
         "EXPO_PUBLIC_IMAP_PORT": "993",
         "EXPO_PUBLIC_IMAP_USER": "ask@morrai.com",
         "EXPO_PUBLIC_IMAP_PASS": "0un:ZX3JOs&E",
-        "EXPO_PUBLIC_IMAP_SECURE": "true"
+        "EXPO_PUBLIC_IMAP_SECURE": "true",
+        "EXPO_PUBLIC_COMETCHAT_APP_ID": "16836945a87e18e94",
+        "EXPO_PUBLIC_COMETCHAT_REGION": "IN",
+        "EXPO_PUBLIC_COMETCHAT_AUTH_KEY": "3bcd11bec07aad2099c398f67fa82393ded20593",
+        "EXPO_PUBLIC_COMETCHAT_REST_API_KEY": "b9d95bcebc4d19aa12882cf7e82bfca5140ef25a"
       }
     },
     "preview": {
@@ -55,7 +59,11 @@
         "EXPO_PUBLIC_IMAP_PORT": "993",
         "EXPO_PUBLIC_IMAP_USER": "ask@morrai.com",
         "EXPO_PUBLIC_IMAP_PASS": "0un:ZX3JOs&E",
-        "EXPO_PUBLIC_IMAP_SECURE": "true"
+        "EXPO_PUBLIC_IMAP_SECURE": "true",
+        "EXPO_PUBLIC_COMETCHAT_APP_ID": "16836945a87e18e94",
+        "EXPO_PUBLIC_COMETCHAT_REGION": "IN",
+        "EXPO_PUBLIC_COMETCHAT_AUTH_KEY": "3bcd11bec07aad2099c398f67fa82393ded20593",
+        "EXPO_PUBLIC_COMETCHAT_REST_API_KEY": "b9d95bcebc4d19aa12882cf7e82bfca5140ef25a"
       }
     },
     "apk:arm64": {
@@ -82,7 +90,11 @@
         "EXPO_PUBLIC_IMAP_PORT": "993",
         "EXPO_PUBLIC_IMAP_USER": "ask@morrai.com",
         "EXPO_PUBLIC_IMAP_PASS": "0un:ZX3JOs&E",
-        "EXPO_PUBLIC_IMAP_SECURE": "true"
+        "EXPO_PUBLIC_IMAP_SECURE": "true",
+        "EXPO_PUBLIC_COMETCHAT_APP_ID": "16836945a87e18e94",
+        "EXPO_PUBLIC_COMETCHAT_REGION": "IN",
+        "EXPO_PUBLIC_COMETCHAT_AUTH_KEY": "3bcd11bec07aad2099c398f67fa82393ded20593",
+        "EXPO_PUBLIC_COMETCHAT_REST_API_KEY": "b9d95bcebc4d19aa12882cf7e82bfca5140ef25a"
       }
     },
     "apk:universal": {
@@ -108,7 +120,11 @@
         "EXPO_PUBLIC_IMAP_PORT": "993",
         "EXPO_PUBLIC_IMAP_USER": "ask@morrai.com",
         "EXPO_PUBLIC_IMAP_PASS": "0un:ZX3JOs&E",
-        "EXPO_PUBLIC_IMAP_SECURE": "true"
+        "EXPO_PUBLIC_IMAP_SECURE": "true",
+        "EXPO_PUBLIC_COMETCHAT_APP_ID": "16836945a87e18e94",
+        "EXPO_PUBLIC_COMETCHAT_REGION": "IN",
+        "EXPO_PUBLIC_COMETCHAT_AUTH_KEY": "3bcd11bec07aad2099c398f67fa82393ded20593",
+        "EXPO_PUBLIC_COMETCHAT_REST_API_KEY": "b9d95bcebc4d19aa12882cf7e82bfca5140ef25a"
       }
     },
     "production": {
@@ -134,7 +150,11 @@
         "EXPO_PUBLIC_IMAP_PORT": "993",
         "EXPO_PUBLIC_IMAP_USER": "ask@morrai.com",
         "EXPO_PUBLIC_IMAP_PASS": "0un:ZX3JOs&E",
-        "EXPO_PUBLIC_IMAP_SECURE": "true"
+        "EXPO_PUBLIC_IMAP_SECURE": "true",
+        "EXPO_PUBLIC_COMETCHAT_APP_ID": "16836945a87e18e94",
+        "EXPO_PUBLIC_COMETCHAT_REGION": "IN",
+        "EXPO_PUBLIC_COMETCHAT_AUTH_KEY": "3bcd11bec07aad2099c398f67fa82393ded20593",
+        "EXPO_PUBLIC_COMETCHAT_REST_API_KEY": "b9d95bcebc4d19aa12882cf7e82bfca5140ef25a"
       }
     }
   },

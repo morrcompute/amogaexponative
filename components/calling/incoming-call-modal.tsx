@@ -8,13 +8,15 @@ import {
   Animated,
   Platform,
 } from 'react-native';
-import { Phone, PhoneOff, Video } from 'lucide-react-native';
+import { Phone, PhoneOff, Video, Users } from 'lucide-react-native';
 
 export interface IncomingCallModalProps {
   visible: boolean;
   callerName: string;
   callerAvatar?: string;
   callType: 'audio' | 'video';
+  isGroupCall?: boolean;
+  groupName?: string;
   onAccept: () => void;
   onReject: () => void;
 }
@@ -24,6 +26,8 @@ export function IncomingCallModal({
   callerName,
   callerAvatar,
   callType,
+  isGroupCall = false,
+  groupName,
   onAccept,
   onReject,
 }: IncomingCallModalProps) {
@@ -55,13 +59,14 @@ export function IncomingCallModal({
 
   if (!visible) return null;
 
+  const displayName = isGroupCall ? (groupName || 'Group Call') : (callerName || 'Unknown Caller');
   const initials =
-    callerName
+    displayName
       ?.split(' ')
       .map((n) => n[0])
       .join('')
       .slice(0, 2)
-      .toUpperCase() || 'AM';
+      .toUpperCase() || (isGroupCall ? 'GP' : 'AM');
 
   return (
     <Modal
@@ -72,26 +77,35 @@ export function IncomingCallModal({
     >
       <View style={styles.backdrop}>
         <View style={styles.card}>
-          <Text style={styles.callTypeBadge}>
-            {callType === 'video' ? 'Incoming Video Call' : 'Incoming Audio Call'}
-          </Text>
+          <View style={styles.badgeRow}>
+            {isGroupCall && <Users size={14} color="#38bdf8" style={{ marginRight: 6 }} />}
+            <Text style={styles.callTypeBadge}>
+              {isGroupCall
+                ? (callType === 'video' ? 'Group Video Call' : 'Group Audio Call')
+                : (callType === 'video' ? 'Incoming Video Call' : 'Incoming Audio Call')}
+            </Text>
+          </View>
 
           {/* Animated Avatar Box */}
           <Animated.View
             style={[
               styles.avatarContainer,
               { transform: [{ scale: pulseAnim }] },
+              isGroupCall && styles.groupAvatarContainer,
             ]}
           >
-            <View style={styles.avatarInner}>
+            <View style={[styles.avatarInner, isGroupCall && styles.groupAvatarInner]}>
               <Text style={styles.avatarText}>{initials}</Text>
             </View>
           </Animated.View>
 
           <Text style={styles.callerName} numberOfLines={1}>
-            {callerName || 'Unknown Caller'}
+            {displayName}
           </Text>
-          <Text style={styles.ringingSub}>Ringing...</Text>
+          
+          <Text style={styles.ringingSub}>
+            {isGroupCall ? `${callerName || 'Someone'} is inviting you to join` : 'Ringing...'}
+          </Text>
 
           {/* Action Buttons: Decline (Red) and Accept (Green) */}
           <View style={styles.actionsRow}>
@@ -124,7 +138,7 @@ export function IncomingCallModal({
                   <Phone size={28} color="#ffffff" />
                 )}
               </TouchableOpacity>
-              <Text style={styles.btnLabel}>Accept</Text>
+              <Text style={styles.btnLabel}>{isGroupCall ? 'Join' : 'Accept'}</Text>
             </View>
           </View>
         </View>
@@ -164,6 +178,10 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     textTransform: 'uppercase',
     letterSpacing: 1.2,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 24,
   },
   avatarContainer: {
@@ -177,6 +195,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(99, 102, 241, 0.5)',
     marginBottom: 20,
   },
+  groupAvatarContainer: {
+    backgroundColor: 'rgba(56, 189, 248, 0.25)',
+    borderColor: 'rgba(56, 189, 248, 0.5)',
+  },
   avatarInner: {
     width: 84,
     height: 84,
@@ -184,6 +206,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#4f46e5',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  groupAvatarInner: {
+    backgroundColor: '#0284c7',
   },
   avatarText: {
     fontSize: 32,

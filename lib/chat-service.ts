@@ -769,3 +769,111 @@ export async function removeConversationMember(
     return false;
   }
 }
+
+/**
+ * Log a call message (completed, missed, or rejected) into the chat conversation
+ */
+export async function logCallMessage(params: {
+  callerId: string;
+  calleeId: string;
+  callType: 'audio' | 'video';
+  status: 'completed' | 'missed' | 'rejected' | 'declined';
+  durationSeconds?: number;
+  isGroup?: boolean;
+}): Promise<void> {
+  try {
+    const { callerId, calleeId, callType, status, durationSeconds = 0, isGroup = false } = params;
+    const now = new Date().toISOString();
+    const typeLabel = isGroup
+      ? (callType === 'video' ? 'Group Video call' : 'Group Audio call')
+      : (callType === 'video' ? 'Video call' : 'Audio call');
+
+    const formatDur = (secs: number) => {
+      const m = Math.floor(secs / 60);
+      const s = secs % 60;
+      if (m > 0) return `${m}m ${s}s`;
+      return `${s}s`;
+    };
+
+    if (isGroup) {
+      const conversationId = calleeId;
+      const durStr = formatDur(durationSeconds);
+      const msgText = `${typeLabel} · ${durStr}`;
+
+      const { data: members } = await supabase
+        .from('conversation_members')
+        .select('user_id')
+        .eq('conversation_id', conversationId);
+
+      if (members && members.length > 0) {
+        const rows = members.map((m) => ({
+          conversation_id: conversationId,
+          owner_user_id: m.user_id,
+          sender_user_id: callerId,
+          message: msgText,
+          message_type: 'call',
+          direction: m.user_id === callerId ? 'Sent' : 'Received',
+          sent: true,
+          received: false,
+          created_at: now,
+          file_name: 'completed',
+          duration: durationSeconds,
+        }));
+
+        await supabase.from('chat_messages').insert(rows as any);
+      }
+      return;
+    }
+
+    const conversationId = await getOrCreateDirectConversation(callerId, calleeId);
+    if (!conversationId) return;
+
+    let callerMsg = typeLabel;
+    let calleeMsg = typeLabel;
+    let fileName = status;
+
+    if (status === 'completed') {
+      const durStr = formatDur(durationSeconds);
+      callerMsg = `${typeLabel} · ${durStr}`;
+      calleeMsg = `${typeLabel} · ${durStr}`;
+    } else if (status === 'missed' || status === 'rejected' || status === 'declined') {
+      callerMsg = `${typeLabel} · Cancelled`;
+      calleeMsg = `Missed ${typeLabel.toLowerCase()}`;
+      fileName = 'missed';
+    }
+
+    // Insert copy for caller (direction: Sent)
+    await supabase.from('chat_messages').insert({
+      conversation_id: conversationId,
+      owner_user_id: callerId,
+      sender_user_id: callerId,
+      message: callerMsg,
+      message_type: 'call',
+      direction: 'Sent',
+      sent: true,
+      received: false,
+      created_at: now,
+      file_name: fileName,
+      duration: durationSeconds,
+    });
+
+    // Insert copy for callee (direction: Received)
+    await supabase.from('chat_messages').insert({
+      conversation_id: conversationId,
+      owner_user_id: calleeId,
+      sender_user_id: callerId,
+      message: calleeMsg,
+      message_type: 'call',
+      direction: 'Received',
+      sent: true,
+      received: false,
+      created_at: now,
+      file_name: fileName,
+      duration: durationSeconds,
+    });
+  } catch (err) {
+    console.error('Error logging call message:', err);
+  }
+}
+
+
