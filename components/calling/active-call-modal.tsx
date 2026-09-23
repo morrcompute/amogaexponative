@@ -291,7 +291,7 @@ export function ActiveCallModal({
           /* ───────────── ACTIVE CALL STATE ───────────── */
           <View style={styles.activeContainer}>
             {isNativeSupported && callToken && CometChatComponent ? (
-              /* Native CometChat WebRTC Calling Component with Safe Area Insets */
+              /* Native CometChat WebRTC Calling Component with Safe Area Insets & Custom Controls Overlay */
               <View
                 style={[
                   styles.nativeCallWrapper,
@@ -306,6 +306,67 @@ export function ActiveCallModal({
                   sessionSettings={sessionSettings}
                   callSettings={sessionSettings}
                 />
+
+                {/* Floating Screen Share & Group Info Overlay on Native Call Screen */}
+                <View
+                  pointerEvents="box-none"
+                  style={[
+                    styles.nativeTopOverlay,
+                    { top: topInset + 10 },
+                  ]}
+                >
+                  {isGroupCall ? (
+                    <View style={styles.nativeGroupBadge}>
+                      <Users size={12} color="#38bdf8" style={{ marginRight: 4 }} />
+                      <Text style={styles.nativeGroupBadgeText}>
+                        {groupName || 'Group Call'} ({participantCount} in call)
+                      </Text>
+                    </View>
+                  ) : (
+                    <View />
+                  )}
+
+                  {/* Floating Direct Screen Share Button */}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={[
+                      styles.nativeScreenShareFloatingBtn,
+                      isScreenSharing && styles.nativeScreenShareFloatingBtnActive,
+                    ]}
+                    onPress={() => setIsScreenSharing(!isScreenSharing)}
+                  >
+                    {isScreenSharing ? (
+                      <ScreenShareOff size={16} color="#ffffff" />
+                    ) : (
+                      <ScreenShare size={16} color="#ffffff" />
+                    )}
+                    <Text style={styles.nativeScreenShareFloatingBtnText}>
+                      {isScreenSharing ? 'Stop Share' : 'Share Screen'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Screen Share Active Banner */}
+                {isScreenSharing && (
+                  <View
+                    pointerEvents="box-none"
+                    style={[
+                      styles.nativeScreenShareBanner,
+                      { top: topInset + 52 },
+                    ]}
+                  >
+                    <View style={styles.screenShareBannerInner}>
+                      <MonitorUp size={14} color="#10b981" style={{ marginRight: 6 }} />
+                      <Text style={styles.screenShareText}>Sharing Screen</Text>
+                      <TouchableOpacity
+                        onPress={() => setIsScreenSharing(false)}
+                        style={styles.stopShareBtn}
+                      >
+                        <Text style={styles.stopShareText}>Stop</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
               </View>
             ) : (
               /* Fallback / Web & Preview Calling Screen with Group & Screen Sharing UI */
@@ -747,5 +808,71 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
+  },
+  nativeTopOverlay: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  nativeGroupBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.3)',
+  },
+  nativeGroupBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#38bdf8',
+  },
+  nativeScreenShareFloatingBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  nativeScreenShareFloatingBtnActive: {
+    backgroundColor: 'rgba(16, 185, 129, 0.9)',
+    borderColor: '#10b981',
+  },
+  nativeScreenShareFloatingBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  nativeScreenShareBanner: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  screenShareBannerInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.5)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
 });
