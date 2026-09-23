@@ -2,7 +2,7 @@
   "expo": {
     "name": "amogamobiledev1",
     "slug": "amogamobiledev1",
-    "owner": "mohdaman",
+    "owner": "morrcompute",
     "scheme": "amogamobiledev1",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,7 +10,11 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.amoga.amogamobiledev1"
+      "bundleIdentifier": "com.amoga.amogamobiledev1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Camera access is required for video calls",
+        "NSMicrophoneUsageDescription": "Microphone access is required for voice and video calls"
+      }
     },
     "android": {
       "package": "com.amoga.amogamobiledev1",
@@ -24,7 +28,11 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ]
     },
     "web": {
@@ -67,14 +75,8 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "ca285e2e-f3c1-4d10-aeb4-f4916ea3f9f7"
+        "projectId": "2129fd33-8191-44ce-8d5d-c5477548cd73"
       }
-    },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/ca285e2e-f3c1-4d10-aeb4-f4916ea3f9f7"
     }
   }
 }

@@ -20,6 +20,7 @@ import { useTheme } from '@/providers/theme-provider';
 import { useModeContext } from '@/providers/mode-provider';
 import { useColorTheme } from '@/providers/color-theme-provider';
 import { useAuth } from '@/providers/auth-provider';
+import { useCall } from '@/providers/call-provider';
 import { useChat } from '@/hooks/useChat';
 import {
   useToast,
@@ -527,6 +528,34 @@ export default function MobileChatScreen() {
     );
   }, [contacts, otherMember, isDirect]);
 
+  const { startCall } = useCall();
+
+  const handleStartCall = useCallback(
+    (type: 'audio' | 'video') => {
+      if (!activeConversation) return;
+
+      if (activeConversation.type === 'direct') {
+        const target = activeConversation.otherMember;
+        if (!target?.id) {
+          toast.error('Unable to start call: recipient user not found');
+          return;
+        }
+
+        startCall(
+          {
+            id: target.id,
+            name: target.name || target.display_name || target.email?.split('@')[0] || 'User',
+            avatar: target.avatar || target.avatar_url || undefined,
+          },
+          type
+        );
+      } else {
+        toast.info('Group calling is coming soon.');
+      }
+    },
+    [activeConversation, startCall, toast]
+  );
+
   const handleSelectChat = (id: string) => {
     setActiveConversationId(id);
     setIsDetailViewOpen(true);
@@ -671,6 +700,8 @@ export default function MobileChatScreen() {
                 conversation={activeConversation}
                 messages={messages}
                 onClose={() => setShowContactInfo(false)}
+                onAudioCall={() => handleStartCall('audio')}
+                onVideoCall={() => handleStartCall('video')}
               />
             ) : (
               <>
@@ -691,6 +722,8 @@ export default function MobileChatScreen() {
                       memberCount={activeConversation?.type === 'group' ? (activeConversation.membersCount || activeConversation.members?.length || 2) : undefined}
                       showDefaultActions={true}
                       onAvatarClick={() => setShowContactInfo(true)}
+                      onAudioCall={() => handleStartCall('audio')}
+                      onVideoCall={() => handleStartCall('video')}
                     />
                   </View>
                 </View>
@@ -1056,6 +1089,14 @@ export default function MobileChatScreen() {
                   if (activeConversationId) return removeMemberFromGroup(activeConversationId, uid);
                 }}
                 onClose={() => setShowContactInfo(false)}
+                onAudioCall={() => {
+                  setShowContactInfo(false);
+                  handleStartCall('audio');
+                }}
+                onVideoCall={() => {
+                  setShowContactInfo(false);
+                  handleStartCall('video');
+                }}
               />
             </Modal>
 

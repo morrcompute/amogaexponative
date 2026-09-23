@@ -13,6 +13,7 @@ import { useTheme } from '@/providers/theme-provider';
 import { useModeContext } from '@/providers/mode-provider';
 import { useColorTheme } from '@/providers/color-theme-provider';
 import { useAuth } from '@/providers/auth-provider';
+import { useCall } from '@/providers/call-provider';
 import { useChat } from '@/hooks/useChat';
 import {
   useToast,
@@ -521,6 +522,34 @@ export default function ChatWebScreen() {
     );
   }, [contacts, otherMember, isDirect]);
 
+  const { startCall } = useCall();
+
+  const handleStartCall = useCallback(
+    (type: 'audio' | 'video') => {
+      if (!activeConversation) return;
+
+      if (activeConversation.type === 'direct') {
+        const target = activeConversation.otherMember;
+        if (!target?.id) {
+          toast.error('Unable to start call: recipient user not found');
+          return;
+        }
+
+        startCall(
+          {
+            id: target.id,
+            name: target.name || target.display_name || target.email?.split('@')[0] || 'User',
+            avatar: target.avatar || target.avatar_url || undefined,
+          },
+          type
+        );
+      } else {
+        toast.info('Group calling is coming soon.');
+      }
+    },
+    [activeConversation, startCall, toast]
+  );
+
   // Auto-select first chat on desktop
   useEffect(() => {
     if (!isMobileOrTablet && !activeConversationId && conversations.length > 0) {
@@ -942,6 +971,8 @@ export default function ChatWebScreen() {
                     onAddMember={(uid) => addMemberToGroup(activeConversationId, uid)}
                     onRemoveMember={(uid) => removeMemberFromGroup(activeConversationId, uid)}
                     onClose={() => setShowContactInfo(false)}
+                    onAudioCall={() => handleStartCall('audio')}
+                    onVideoCall={() => handleStartCall('video')}
                   />
                 ) : (
                   <>
@@ -953,6 +984,8 @@ export default function ChatWebScreen() {
                       memberCount={activeConversation?.type === 'group' ? (activeConversation.membersCount || activeConversation.members?.length || 2) : undefined}
                       showDefaultActions={true}
                       onAvatarClick={() => setShowContactInfo(true)}
+                      onAudioCall={() => handleStartCall('audio')}
+                      onVideoCall={() => handleStartCall('video')}
                       onDelete={signOut}
                       onClose={isMobileOrTablet ? () => setActiveConversationId(null) : undefined}
                     />

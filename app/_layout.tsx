@@ -5,6 +5,7 @@ import { Spinner, ToastProvider, View } from 'amogamobileds-v1';
 import { AuthProvider, useAuth } from '@/providers/auth-provider';
 import { ThemeProvider, useTheme } from '@/providers/theme-provider';
 import { ColorThemeProvider } from '@/providers/color-theme-provider';
+import { CallProvider } from '@/providers/call-provider';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { Stack, useRouter, useSegments } from 'expo-router';
@@ -118,10 +119,12 @@ export default function RootLayout() {
       <ThemeProvider>
         <ColorThemeProvider>
           <AuthProvider>
-            <ToastProvider>
-              <ThemedStatusBar />
-              <RootNavigator />
-            </ToastProvider>
+            <CallProvider>
+              <ToastProvider>
+                <ThemedStatusBar />
+                <RootNavigator />
+              </ToastProvider>
+            </CallProvider>
           </AuthProvider>
         </ColorThemeProvider>
       </ThemeProvider>

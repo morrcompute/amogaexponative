@@ -164,3 +164,8 @@ declare module 'expo-location' {
   }>>;
 }
 
+declare module '@cometchat/calls-sdk-react-native' {
+  export const CometChatCalls: any;
+  export default CometChatCalls;
+}
+
