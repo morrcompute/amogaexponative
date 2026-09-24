@@ -85,6 +85,48 @@ export function ActiveCallModal({
   const [isCameraFront, setIsCameraFront] = useState(true); // track which camera is active
   const [callLayout, setCallLayout] = useState<'TILE' | 'SPOTLIGHT'>('TILE');
 
+  // Memoize sessionSettings — using CometChat native recording & screen sharing
+  const sessionSettings = useMemo(() => {
+    return {
+      sessionType: callType === 'audio' ? 'VOICE' : 'VIDEO',
+      isAudioOnly: callType === 'audio',
+      layout: callLayout,
+      defaultLayout: true,
+      // Hide CometChat internal header panel so custom 4-icon top bar does not collide
+      hideHeaderPanel: true,
+      hideSwitchCameraButton: true,
+      hideChangeLayoutButton: true,
+      // ── Screen Sharing (CometChat Native) ─────────────────────────────────
+      isDesktopSharingEnabled: true,
+      hideScreenSharingButton: false,       // correct SDK prop (with "ing")
+      ShowScreenShareButton: true,
+      hideScreenShareButton: false,
+      // ── Recording Disabled ────────────────────────────────────────────────
+      hideRecordingButton: true,
+      ShowRecordingButton: false,
+      // ── Call Controls ──────────────────────────────────────────────────────
+      hideLeaveSessionButton: false,
+      ShowEndCallButton: true,
+      hideToggleAudioButton: false,
+      ShowMuteAudioButton: true,
+      hideToggleVideoButton: callType === 'audio',
+      ShowPauseVideoButton: callType === 'video',
+      hideAudioModeButton: false,
+      ShowAudioModeButton: true,
+      // ── Default States ─────────────────────────────────────────────────────
+      startAudioMuted: false,
+      StartAudioMuted: false,
+      startVideoPaused: false,
+      StartVideoMuted: false,
+      audioMode: 'SPEAKER',
+      defaultAudioMode: 'SPEAKER',
+      initialCameraFacing: 'FRONT',
+      enableSpotlightSwap: true,
+      enableSpotlightDrag: true,
+      maxParticipantCount: isGroupCall ? 25 : 2,
+    };
+  }, [callType, isGroupCall, callLayout]);
+
   // Pulse animation for outgoing calling screen
   useEffect(() => {
     if (!visible || callState !== 'outgoing') return;
@@ -114,6 +156,7 @@ export function ActiveCallModal({
   const localWebStreamRef = useRef<any>(null);
   const webVideoRef = useRef<any>(null);
   const webScreenVideoRef = useRef<any>(null);
+  const webCallContainerRef = useRef<any>(null);
 
   // Stop web media stream and release tracks
   const stopWebMedia = useCallback(() => {
@@ -133,8 +176,8 @@ export function ActiveCallModal({
   // Stop screen sharing cleanly and release system media tracks
   const stopScreenShare = useCallback(() => {
     try {
-      if (Platform.OS !== 'web' && cometchatService.isSupported()) {
-        console.log('[ScreenShare] Stopping native CometChat screen sharing...');
+      if (cometchatService.isSupported()) {
+        console.log('[ScreenShare] Stopping CometChat screen sharing...');
         cometchatService.stopScreenSharing();
       }
       if (screenStreamRef.current) {
@@ -154,21 +197,21 @@ export function ActiveCallModal({
     setIsScreenSharing(false);
   }, []);
 
-  // Start screen sharing with CometChat WebRTC conference engine or Web MediaDevices
+  // Start screen sharing with CometChat WebRTC conference engine or Web MediaDevices fallback
   const startScreenShare = useCallback(async () => {
     try {
-      if (Platform.OS !== 'web' && cometchatService.isSupported()) {
-        console.log('[ScreenShare] Starting native CometChat screen sharing via Calls SDK...');
+      if (cometchatService.isSupported()) {
+        console.log('[ScreenShare] Starting CometChat screen sharing via Calls SDK...');
         cometchatService.startScreenSharing();
-        // The SDK onScreenShareStarted event listener will update isScreenSharing to true
+        setIsScreenSharing(true);
         return;
       }
 
-      // Web / Browser environment
+      // Web / Browser environment fallback
       if (Platform.OS === 'web') {
         const nav = typeof navigator !== 'undefined' ? (navigator as any) : null;
         if (nav && nav.mediaDevices && nav.mediaDevices.getDisplayMedia) {
-          console.log('[ScreenShare] Requesting browser getDisplayMedia...');
+          console.log('[ScreenShare] Requesting browser getDisplayMedia fallback...');
           const stream = await nav.mediaDevices.getDisplayMedia({
             video: true,
             audio: false,
@@ -211,6 +254,43 @@ export function ActiveCallModal({
       }
     }
   }, [stopScreenShare]);
+
+  // On Web, mount CometChat Calls SDK into container when call is active
+  useEffect(() => {
+    if (Platform.OS !== 'web' || callState !== 'active' || !callToken) return;
+
+    let isMounted = true;
+    const mountCall = async () => {
+      // Short tick to ensure DOM element is mounted
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      if (!isMounted) return;
+
+      const container =
+        webCallContainerRef.current ||
+        (typeof document !== 'undefined' ? document.getElementById('cometchat-web-call-container') : null);
+
+      if (container) {
+        console.log('[WebCall] Mounting CometChat WebRTC conference into container...');
+        const res = await cometchatService.startWebSession(callToken, sessionSettings, container);
+        if (!res.success && isMounted) {
+          console.warn('[WebCall] Failed to start web session:', res.error);
+        }
+      } else {
+        console.warn('[WebCall] Container element not found for CometChat WebRTC conference');
+      }
+    };
+
+    mountCall();
+
+    return () => {
+      isMounted = false;
+      if (Platform.OS === 'web') {
+        console.log('[WebCall] Leaving CometChat web session on unmount');
+        cometchatService.leaveSession();
+      }
+    };
+  }, [callState, callToken, sessionSettings]);
+
 
 
   const toggleScreenShare = useCallback(() => {
@@ -394,48 +474,6 @@ export function ActiveCallModal({
   }, [visible, callState, handleEndCall, conversationId, currentUserId, partnerId, callType]);
 
 
-  // Memoize sessionSettings — using CometChat native recording & screen sharing
-  const sessionSettings = useMemo(() => {
-    return {
-      sessionType: callType === 'audio' ? 'VOICE' : 'VIDEO',
-      isAudioOnly: callType === 'audio',
-      layout: callLayout,
-      defaultLayout: true,
-      // Hide CometChat internal header panel so custom 4-icon top bar does not collide
-      hideHeaderPanel: true,
-      hideSwitchCameraButton: true,
-      hideChangeLayoutButton: true,
-      // ── Screen Sharing (CometChat Native) ─────────────────────────────────
-      isDesktopSharingEnabled: true,
-      hideScreenSharingButton: false,       // correct SDK prop (with "ing")
-      ShowScreenShareButton: true,
-      hideScreenShareButton: false,
-      // ── Recording Disabled ────────────────────────────────────────────────
-      hideRecordingButton: true,
-      ShowRecordingButton: false,
-      // ── Call Controls ──────────────────────────────────────────────────────
-      hideLeaveSessionButton: false,
-      ShowEndCallButton: true,
-      hideToggleAudioButton: false,
-      ShowMuteAudioButton: true,
-      hideToggleVideoButton: callType === 'audio',
-      ShowPauseVideoButton: callType === 'video',
-      hideAudioModeButton: false,
-      ShowAudioModeButton: true,
-      // ── Default States ─────────────────────────────────────────────────────
-      startAudioMuted: false,
-      StartAudioMuted: false,
-      startVideoPaused: false,
-      StartVideoMuted: false,
-      audioMode: 'SPEAKER',
-      defaultAudioMode: 'SPEAKER',
-      initialCameraFacing: 'FRONT',
-      enableSpotlightSwap: true,
-      enableSpotlightDrag: true,
-      maxParticipantCount: isGroupCall ? 25 : 2,
-    };
-  }, [callType, isGroupCall, callLayout]);
-
 
   if (!visible) return null;
 
@@ -533,8 +571,8 @@ export function ActiveCallModal({
         ) : (
           /* ───────────── ACTIVE CALL STATE ───────────── */
           <View style={styles.activeContainer}>
-            {isNativeSupported && callToken && CometChatComponent ? (
-              /* Native CometChat WebRTC Calling Component with Safe Area Insets & Custom Controls Overlay */
+            {callToken && ((Platform.OS !== 'web' && CometChatComponent) || Platform.OS === 'web') ? (
+              /* CometChat WebRTC Calling Component (Native & Web) with Safe Area Insets & Custom Controls Overlay */
               <View
                 style={[
                   styles.nativeCallWrapper,
@@ -544,11 +582,30 @@ export function ActiveCallModal({
                   },
                 ]}
               >
-                <CometChatComponent
-                  callToken={callToken}
-                  sessionSettings={sessionSettings}
-                  callSettings={sessionSettings}
-                />
+                {Platform.OS === 'web' ? (
+                  React.createElement('div', {
+                    id: 'cometchat-web-call-container',
+                    ref: webCallContainerRef,
+                    style: {
+                      width: '100%',
+                      height: '100%',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundColor: '#0a0f1d',
+                      zIndex: 1,
+                    },
+                  })
+                ) : (
+                  <CometChatComponent
+                    callToken={callToken}
+                    sessionSettings={sessionSettings}
+                    callSettings={sessionSettings}
+                  />
+                )}
+
 
                 {/* ── Top Bar: Duration/Group Badge on Left, 3 Control Icons on Right in ONE Row ── */}
                 <View

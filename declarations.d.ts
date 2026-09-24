@@ -169,3 +169,11 @@ declare module '@cometchat/calls-sdk-react-native' {
   export default CometChatCalls;
 }
 
+declare module '@cometchat/calls-sdk-javascript' {
+  export const CometChatCalls: any;
+  export const CallAppSettingsBuilder: any;
+  export const CallSettingsBuilder: any;
+  export default CometChatCalls;
+}
+
+

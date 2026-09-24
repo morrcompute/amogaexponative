@@ -11,8 +11,15 @@ export const COMETCHAT_CONFIG = {
 
 let CometChatCallsSDK: any = null;
 
-// Dynamically and safely load @cometchat/calls-sdk-react-native only on native platforms
-if (Platform.OS !== 'web') {
+// Dynamically and safely load calling SDK for web and native
+if (Platform.OS === 'web') {
+  try {
+    const pkg = require('@cometchat/calls-sdk-javascript');
+    CometChatCallsSDK = pkg.CometChatCalls || (typeof window !== 'undefined' && (window as any).CometChatCalls) || pkg.default || pkg;
+  } catch (err) {
+    console.warn('[CometChat] Failed to load web calling SDK (@cometchat/calls-sdk-javascript):', err);
+  }
+} else {
   try {
     const pkg = require('@cometchat/calls-sdk-react-native');
     CometChatCallsSDK = pkg.CometChatCalls || pkg.default || pkg;
@@ -23,6 +30,7 @@ if (Platform.OS !== 'web') {
     );
   }
 }
+
 
 export interface CometChatInitResult {
   success: boolean;
@@ -120,7 +128,7 @@ class CometChatService {
     if (!this.isSupported()) {
       return {
         success: false,
-        error: 'CometChat Calls SDK is only available in native development builds.',
+        error: 'CometChat Calls SDK is not loaded.',
       };
     }
 
@@ -141,7 +149,7 @@ class CometChatService {
       }
 
       const result = await CometChatCallsSDK.init(callAppSettings);
-      if (result && result.success !== false) {
+      if (result === undefined || result?.success !== false) {
         this.isInitialized = true;
         console.log('[CometChat] Calls SDK initialized successfully');
         return { success: true };
@@ -154,6 +162,33 @@ class CometChatService {
       return { success: false, error };
     }
   }
+
+  /**
+   * Start and mount a WebRTC conference call on web inside a DOM container
+   */
+  public async startWebSession(
+    callToken: string,
+    sessionSettings: any,
+    containerElement: HTMLElement | any
+  ): Promise<{ success: boolean; error?: any }> {
+    if (!this.isSupported()) {
+      return { success: false, error: 'Calling SDK not loaded on web.' };
+    }
+
+    try {
+      console.log('[CometChat] Starting web call session in container...');
+      if (typeof CometChatCallsSDK.startSession === 'function') {
+        await CometChatCallsSDK.startSession(callToken, sessionSettings, containerElement);
+      } else if (typeof CometChatCallsSDK.joinSession === 'function') {
+        await CometChatCallsSDK.joinSession(callToken, sessionSettings, containerElement);
+      }
+      return { success: true };
+    } catch (error: any) {
+      console.error('[CometChat] startWebSession error:', error?.message || error);
+      return { success: false, error: error?.message || error };
+    }
+  }
+
 
   /**
    * Authenticate a user into CometChat Calls with auto-provision fallback
@@ -208,6 +243,7 @@ class CometChatService {
       }
 
       this.currentLoggedInUid = uid;
+      this.currentUserAuthToken = user?.authToken || null;
       console.log('[CometChat] Logged in successfully:', uid);
       return { success: true, user };
     } catch (error: any) {
@@ -224,6 +260,7 @@ class CometChatService {
     try {
       await CometChatCallsSDK.logout();
       this.currentLoggedInUid = null;
+      this.currentUserAuthToken = null;
     } catch (error) {
       console.warn('[CometChat] Logout error:', error);
     }
@@ -235,23 +272,79 @@ class CometChatService {
   public async generateToken(
     sessionId: string
   ): Promise<{ success: boolean; token?: string; error?: any }> {
-    if (!this.isSupported()) {
-      return { success: false, error: 'Calling SDK not loaded on this platform.' };
+    const { appId, region, restApiKey, authKey } = COMETCHAT_CONFIG;
+    const effectiveKey = restApiKey || authKey;
+
+    // 1. Try SDK generateToken first if supported
+    if (this.isSupported() && typeof CometChatCallsSDK?.generateToken === 'function') {
+      try {
+        console.log('[CometChat] Generating call token for session via SDK:', sessionId);
+        const response = await CometChatCallsSDK.generateToken(sessionId);
+        if (response && response.token) {
+          console.log('[CometChat] Generated call token successfully via SDK');
+          return { success: true, token: response.token };
+        }
+      } catch (error: any) {
+        console.warn('[CometChat] SDK generateToken failed, trying REST API fallback:', error?.message || error);
+      }
     }
 
-    try {
-      console.log('[CometChat] Generating call token for session:', sessionId);
-      const response = await CometChatCallsSDK.generateToken(sessionId);
-      if (response && response.token) {
-        console.log('[CometChat] Generated call token successfully');
-        return { success: true, token: response.token };
+    // 2. Direct REST API token generation fallback
+    if (appId && this.currentLoggedInUid) {
+      try {
+        console.log('[CometChat] Generating call token via REST API fallback for session:', sessionId);
+
+        // Ensure we have an authToken for the user
+        let userAuthToken = this.currentUserAuthToken;
+        if (!userAuthToken && effectiveKey) {
+          try {
+            const authUrl = `https://${appId}.api-${region.toLowerCase()}.cometchat.io/v3/users/${this.currentLoggedInUid}/auth_tokens`;
+            const authRes = await fetch(authUrl, {
+              method: 'POST',
+              headers: {
+                apiKey: effectiveKey,
+                appId: appId,
+                'Content-Type': 'application/json',
+              },
+            });
+            const authData = await authRes.json().catch(() => ({}));
+            userAuthToken = authData?.data?.authToken || null;
+            if (userAuthToken) {
+              this.currentUserAuthToken = userAuthToken;
+            }
+          } catch (e) {
+            console.warn('[CometChat] Failed to create authToken for REST fallback:', e);
+          }
+        }
+
+        if (userAuthToken) {
+          const url = `https://${appId}.call-${region.toLowerCase()}.cometchat.io/v3.0/call_tokens`;
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+              appId: appId,
+              authToken: userAuthToken,
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+            body: JSON.stringify({ sessionId }),
+          });
+          const data = await res.json().catch(() => ({}));
+          const token = data?.data?.token || data?.token;
+          if (token) {
+            console.log('[CometChat] Generated call token successfully via REST API fallback');
+            return { success: true, token };
+          }
+        }
+      } catch (restErr) {
+        console.warn('[CometChat] REST API token generation failed:', restErr);
       }
-      return { success: false, error: 'No token received from CometChat.' };
-    } catch (error: any) {
-      console.error('[CometChat] Failed to generate call token:', error?.message || error);
-      return { success: false, error: error?.message || error };
     }
+
+    return { success: false, error: 'Could not generate call token from SDK or REST API.' };
   }
+
+
 
   /**
    * Leave the active call session
