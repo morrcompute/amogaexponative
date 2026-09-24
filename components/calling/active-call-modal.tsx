@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
+  useWindowDimensions,
   Platform,
   ScrollView,
   Alert,
@@ -77,6 +78,10 @@ export function ActiveCallModal({
   conversationId,
 }: ActiveCallModalProps) {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && windowWidth >= 768;
+  const isMobile = Platform.OS !== 'web' || windowWidth < 768;
+
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const [callDuration, setCallDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
@@ -84,73 +89,6 @@ export function ActiveCallModal({
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isCameraFront, setIsCameraFront] = useState(true); // track which camera is active
   const [callLayout, setCallLayout] = useState<'TILE' | 'SPOTLIGHT'>('TILE');
-
-  // Memoize sessionSettings — using CometChat native recording & screen sharing
-  const sessionSettings = useMemo(() => {
-    return {
-      sessionType: callType === 'audio' ? 'VOICE' : 'VIDEO',
-      isAudioOnly: callType === 'audio',
-      layout: callLayout,
-      defaultLayout: true,
-      // Hide CometChat internal header panel so custom 4-icon top bar does not collide
-      hideHeaderPanel: true,
-      hideSwitchCameraButton: true,
-      hideChangeLayoutButton: true,
-      // ── Screen Sharing (CometChat Native) ─────────────────────────────────
-      isDesktopSharingEnabled: true,
-      hideScreenSharingButton: false,       // correct SDK prop (with "ing")
-      ShowScreenShareButton: true,
-      hideScreenShareButton: false,
-      // ── Recording Disabled ────────────────────────────────────────────────
-      hideRecordingButton: true,
-      ShowRecordingButton: false,
-      // ── Call Controls ──────────────────────────────────────────────────────
-      hideLeaveSessionButton: false,
-      ShowEndCallButton: true,
-      hideToggleAudioButton: false,
-      ShowMuteAudioButton: true,
-      hideToggleVideoButton: callType === 'audio',
-      ShowPauseVideoButton: callType === 'video',
-      hideAudioModeButton: false,
-      ShowAudioModeButton: true,
-      // ── Default States ─────────────────────────────────────────────────────
-      startAudioMuted: false,
-      StartAudioMuted: false,
-      startVideoPaused: false,
-      StartVideoMuted: false,
-      audioMode: 'SPEAKER',
-      defaultAudioMode: 'SPEAKER',
-      initialCameraFacing: 'FRONT',
-      enableSpotlightSwap: true,
-      enableSpotlightDrag: true,
-      maxParticipantCount: isGroupCall ? 25 : 2,
-    };
-  }, [callType, isGroupCall, callLayout]);
-
-  // Pulse animation for outgoing calling screen
-  useEffect(() => {
-    if (!visible || callState !== 'outgoing') return;
-
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.2,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    pulse.start();
-
-    return () => {
-      pulse.stop();
-    };
-  }, [visible, callState, pulseAnim]);
 
   const screenStreamRef = useRef<any>(null);
   const localWebStreamRef = useRef<any>(null);
@@ -196,6 +134,117 @@ export function ActiveCallModal({
     }
     setIsScreenSharing(false);
   }, []);
+
+  // Wrapper for ending call cleanly
+  const handleEndCall = useCallback(async () => {
+    console.log('[ActiveCallModal] handleEndCall initiated');
+    stopScreenShare();
+    stopWebMedia();
+    cometchatService.leaveSession();
+    onEndCall();
+  }, [stopScreenShare, stopWebMedia, onEndCall]);
+
+  // Memoize sessionSettings — configured for Desktop Web & Mobile APK
+  const sessionSettings = useMemo(() => {
+    return {
+      sessionType: callType === 'audio' ? 'VOICE' : 'VIDEO',
+      isAudioOnly: callType === 'audio',
+      mode: callLayout === 'TILE' ? 'SIDEBAR' : 'SPOTLIGHT',
+      layout: callLayout === 'TILE' ? 'SIDEBAR' : 'SPOTLIGHT',
+      defaultLayout: true,
+      enableDefaultLayout: true,
+      hideHeaderPanel: true,
+      hideSwitchCameraButton: true,
+      // ── Desktop Layout & Controls (all docked at bottom) ─────────────────
+      hideChangeLayoutButton: false,
+      ShowSwitchModeButton: true,
+      ShowVirtualBackgroundSetting: true,
+      hideVirtualBackgroundButton: false,
+      hideRaiseHandButton: false,
+      // ── Screen Sharing (CometChat Native) ─────────────────────────────────
+      isDesktopSharingEnabled: true,
+      hideScreenSharingButton: false,
+      ShowScreenShareButton: true,
+      hideScreenShareButton: false,
+      // ── Recording Disabled ────────────────────────────────────────────────
+      hideRecordingButton: true,
+      ShowRecordingButton: false,
+      // ── Call Controls ──────────────────────────────────────────────────────
+      hideLeaveSessionButton: false,
+      ShowEndCallButton: true,
+      hideToggleAudioButton: false,
+      ShowMuteAudioButton: true,
+      hideToggleVideoButton: callType === 'audio',
+      ShowPauseVideoButton: callType === 'video',
+      hideAudioModeButton: false,
+      ShowAudioModeButton: true,
+      // ── Default States ─────────────────────────────────────────────────────
+      startAudioMuted: false,
+      StartAudioMuted: false,
+      startVideoPaused: false,
+      StartVideoMuted: false,
+      audioMode: 'SPEAKER',
+      defaultAudioMode: 'SPEAKER',
+      initialCameraFacing: 'FRONT',
+      enableSpotlightSwap: true,
+      enableSpotlightDrag: true,
+      maxParticipantCount: isGroupCall ? 25 : 2,
+      // ── Call Listener: binds CometChat leave button directly to React state ─
+      getCallListener: () => ({
+        onCallEndButtonPressed: () => {
+          console.log('[WebCall] onCallEndButtonPressed fired from CometChat SDK');
+          handleEndCall();
+        },
+        onCallEnded: () => {
+          console.log('[WebCall] onCallEnded fired from CometChat SDK');
+          handleEndCall();
+        },
+        onUserLeft: (u: any) => {
+          console.log('[WebCall] onUserLeft fired:', u);
+          if (!isGroupCall) {
+            handleEndCall();
+          }
+        },
+        onSessionTimeout: () => {
+          console.log('[WebCall] onSessionTimeout fired');
+          handleEndCall();
+        },
+        onScreenShareStarted: () => {
+          console.log('[WebCall] onScreenShareStarted fired');
+          setIsScreenSharing(true);
+        },
+        onScreenShareStopped: () => {
+          console.log('[WebCall] onScreenShareStopped fired');
+          setIsScreenSharing(false);
+        },
+      }),
+    };
+  }, [callType, isGroupCall, callLayout, handleEndCall]);
+
+  // Pulse animation for outgoing calling screen
+  useEffect(() => {
+    if (!visible || callState !== 'outgoing') return;
+
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.2,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+
+    return () => {
+      pulse.stop();
+    };
+  }, [visible, callState, pulseAnim]);
 
   // Start screen sharing with CometChat WebRTC conference engine or Web MediaDevices fallback
   const startScreenShare = useCallback(async () => {
@@ -318,7 +367,11 @@ export function ActiveCallModal({
 
   // Layout toggle (TILE <-> SPOTLIGHT)
   const handleToggleLayout = useCallback(() => {
-    setCallLayout((prev) => (prev === 'TILE' ? 'SPOTLIGHT' : 'TILE'));
+    setCallLayout((prev) => {
+      const next = prev === 'TILE' ? 'SPOTLIGHT' : 'TILE';
+      cometchatService.setLayout(next);
+      return next;
+    });
   }, []);
 
   // CometChat mic mute toggle
@@ -327,12 +380,37 @@ export function ActiveCallModal({
     setIsMuted((prev) => !prev);
   }, []);
 
-  // Wrapper for ending call
-  const handleEndCall = useCallback(async () => {
-    stopScreenShare();
-    stopWebMedia();
-    onEndCall();
-  }, [stopScreenShare, stopWebMedia, onEndCall]);
+  // Capture leave/hangup clicks in Web DOM to ensure disconnect button always ends call
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !visible || callState !== 'active') return;
+
+    const handleWebClickCapture = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const btn = target.closest('button, [role="button"], a');
+      if (btn) {
+        const cls = (btn.className || '').toString().toLowerCase();
+        const title = (btn.getAttribute('title') || '').toLowerCase();
+        const aria = (btn.getAttribute('aria-label') || '').toLowerCase();
+        const text = (((btn as any).innerText as string) || btn.textContent || '').toLowerCase();
+
+        if (
+          cls.includes('leave') || cls.includes('hangup') || cls.includes('end') ||
+          title.includes('leave') || title.includes('end') || title.includes('hang up') ||
+          aria.includes('leave') || aria.includes('end') || aria.includes('hang up') ||
+          text.includes('leave') || text.includes('end') || text.includes('hang up')
+        ) {
+          console.log('[ActiveCallModal Web] User clicked leave/hangup in DOM, ending call');
+          handleEndCall();
+        }
+      }
+    };
+
+    document.addEventListener('click', handleWebClickCapture, true);
+    return () => {
+      document.removeEventListener('click', handleWebClickCapture, true);
+    };
+  }, [visible, callState, handleEndCall]);
 
   // Duration timer & cleanup during active call
   useEffect(() => {
@@ -354,9 +432,10 @@ export function ActiveCallModal({
     };
   }, [visible, callState, stopScreenShare, stopWebMedia]);
 
-  // Setup Web camera & mic stream when call becomes active on Web
+  // Setup Web camera & mic stream ONLY when call is active on Web without callToken (fallback preview)
+  // When callToken is present, CometChat Calls SDK manages media tracks exclusively (prevents camera lock on video screen sharing)
   useEffect(() => {
-    if (!visible || callState !== 'active' || Platform.OS !== 'web') {
+    if (!visible || callState !== 'active' || Platform.OS !== 'web' || Boolean(callToken)) {
       stopWebMedia();
       return;
     }
@@ -570,12 +649,15 @@ export function ActiveCallModal({
             <TouchableOpacity
               activeOpacity={0.8}
               style={styles.hangupBtn}
-              onPress={onEndCall}
+              onPress={handleEndCall}
               accessibilityRole="button"
               accessibilityLabel="Cancel Call"
             >
               <PhoneOff size={32} color="#ffffff" />
             </TouchableOpacity>
+            <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '600', marginTop: 12 }}>
+              Cancel Call
+            </Text>
           </View>
         ) : (
           /* ───────────── ACTIVE CALL STATE ───────────── */
@@ -616,7 +698,7 @@ export function ActiveCallModal({
                 )}
 
 
-                {/* ── Top Bar: Duration/Group Badge on Left, 3 Control Icons on Right in ONE Row ── */}
+                {/* ── Top Bar: Duration/Group Badge on Left, 3 Control Icons on Right for Mobile ── */}
                 <View
                   pointerEvents="box-none"
                   style={[
@@ -639,56 +721,79 @@ export function ActiveCallModal({
                     </View>
                   )}
 
-                  {/* Right side: Control Icons in a single, neat horizontal row */}
-                  <View style={styles.nativeActionBtnsRow}>
-                    {/* 1. Camera Switch (front / back) */}
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      style={[
-                        styles.nativeActionIconBtn,
-                        callType === 'audio' && styles.nativeActionIconBtnDisabled,
-                      ]}
-                      onPress={handleSwitchCamera}
-                      disabled={callType === 'audio'}
-                      accessibilityRole="button"
-                      accessibilityLabel="Switch Camera"
-                    >
-                      <SwitchCamera size={18} color={callType === 'audio' ? '#64748b' : '#ffffff'} />
-                    </TouchableOpacity>
+                  {/* Mobile Only: 3 Control Icons in a single, neat horizontal row */}
+                  {isMobile && (
+                    <View style={styles.nativeActionBtnsRow}>
+                      {/* 1. Camera Switch (front / back) */}
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        style={[
+                          styles.nativeActionIconBtn,
+                          callType === 'audio' && styles.nativeActionIconBtnDisabled,
+                        ]}
+                        onPress={handleSwitchCamera}
+                        disabled={callType === 'audio'}
+                        accessibilityRole="button"
+                        accessibilityLabel="Switch Camera"
+                      >
+                        <SwitchCamera size={18} color={callType === 'audio' ? '#64748b' : '#ffffff'} />
+                      </TouchableOpacity>
 
-                    {/* 2. Layout Switch (Grid / Spotlight) */}
+                      {/* 2. Layout Switch (Grid / Spotlight) */}
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        style={[
+                          styles.nativeActionIconBtn,
+                          callLayout === 'SPOTLIGHT' && styles.nativeLayoutIconBtnActive,
+                        ]}
+                        onPress={handleToggleLayout}
+                        accessibilityRole="button"
+                        accessibilityLabel="Toggle Layout"
+                      >
+                        <LayoutGrid size={18} color={callLayout === 'SPOTLIGHT' ? '#38bdf8' : '#ffffff'} />
+                      </TouchableOpacity>
+
+                      {/* 3. Screen Share (CometChat screen sharing) */}
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        style={[
+                          styles.nativeActionIconBtn,
+                          isScreenSharing && styles.nativeScreenShareIconBtnActive,
+                        ]}
+                        onPress={toggleScreenShare}
+                        accessibilityRole="button"
+                        accessibilityLabel={isScreenSharing ? 'Stop Screen Share' : 'Start Screen Share'}
+                      >
+                        {isScreenSharing ? (
+                          <ScreenShareOff size={18} color="#ffffff" />
+                        ) : (
+                          <ScreenShare size={18} color="#ffffff" />
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+
+                {/* Desktop Web: Clean Layout Mode Button on Bottom */}
+                {isDesktopWeb && (
+                  <View style={styles.desktopBottomLayoutContainer} pointerEvents="box-none">
                     <TouchableOpacity
-                      activeOpacity={0.8}
+                      activeOpacity={0.85}
                       style={[
-                        styles.nativeActionIconBtn,
-                        callLayout === 'SPOTLIGHT' && styles.nativeLayoutIconBtnActive,
+                        styles.desktopLayoutDockBtn,
+                        callLayout === 'SPOTLIGHT' && styles.desktopLayoutDockBtnActive,
                       ]}
                       onPress={handleToggleLayout}
                       accessibilityRole="button"
-                      accessibilityLabel="Toggle Layout"
+                      accessibilityLabel="Toggle Layout Mode"
                     >
-                      <LayoutGrid size={18} color={callLayout === 'SPOTLIGHT' ? '#38bdf8' : '#ffffff'} />
-                    </TouchableOpacity>
-
-                    {/* 3. Screen Share (CometChat screen sharing) */}
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      style={[
-                        styles.nativeActionIconBtn,
-                        isScreenSharing && styles.nativeScreenShareIconBtnActive,
-                      ]}
-                      onPress={toggleScreenShare}
-                      accessibilityRole="button"
-                      accessibilityLabel={isScreenSharing ? 'Stop Screen Share' : 'Start Screen Share'}
-                    >
-                      {isScreenSharing ? (
-                        <ScreenShareOff size={18} color="#ffffff" />
-                      ) : (
-                        <ScreenShare size={18} color="#ffffff" />
-                      )}
+                      <LayoutGrid size={16} color={callLayout === 'SPOTLIGHT' ? '#38bdf8' : '#ffffff'} style={{ marginRight: 6 }} />
+                      <Text style={[styles.desktopLayoutDockText, callLayout === 'SPOTLIGHT' && styles.desktopLayoutDockTextActive]}>
+                        {callLayout === 'SPOTLIGHT' ? 'Spotlight' : 'Grid'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
-                </View>
+                )}
 
                 {/* Screen Share Active Banner */}
                 {isScreenSharing && (
@@ -722,22 +827,75 @@ export function ActiveCallModal({
               >
                 {/* Header Information Bar */}
                 <View style={styles.headerInfo}>
-                  <View style={styles.topBadgeRow}>
-                    {isGroupCall && (
-                      <View style={styles.participantCountBadge}>
-                        <Users size={12} color="#38bdf8" style={{ marginRight: 4 }} />
-                        <Text style={styles.participantCountText}>
-                          {isGroupCall ? `${displayParticipants.length} in call` : '1-on-1'}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                    <View>
+                      <View style={styles.topBadgeRow}>
+                        {isGroupCall && (
+                          <View style={styles.participantCountBadge}>
+                            <Users size={12} color="#38bdf8" style={{ marginRight: 4 }} />
+                            <Text style={styles.participantCountText}>
+                              {isGroupCall ? `${displayParticipants.length} in call` : '1-on-1'}
+                            </Text>
+                          </View>
+                        )}
+                        <Text style={styles.callTypeBadge}>
+                          {callType === 'video' ? 'VIDEO CALL' : 'AUDIO CALL'}
                         </Text>
                       </View>
-                    )}
-                    <Text style={styles.callTypeBadge}>
-                      {callType === 'video' ? 'VIDEO CALL' : 'AUDIO CALL'}
-                    </Text>
-                  </View>
 
-                  <Text style={styles.partnerNameSmall}>{titleText}</Text>
-                  <Text style={styles.timerText}>{formatDuration(callDuration)}</Text>
+                      <Text style={styles.partnerNameSmall}>{titleText}</Text>
+                      <Text style={styles.timerText}>{formatDuration(callDuration)}</Text>
+                    </View>
+
+                    {/* Mobile 3-icon row in fallback view */}
+                    {isMobile && (
+                      <View style={styles.nativeActionBtnsRow}>
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          style={[
+                            styles.nativeActionIconBtn,
+                            callType === 'audio' && styles.nativeActionIconBtnDisabled,
+                          ]}
+                          onPress={handleSwitchCamera}
+                          disabled={callType === 'audio'}
+                          accessibilityRole="button"
+                          accessibilityLabel="Switch Camera"
+                        >
+                          <SwitchCamera size={18} color={callType === 'audio' ? '#64748b' : '#ffffff'} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          style={[
+                            styles.nativeActionIconBtn,
+                            callLayout === 'SPOTLIGHT' && styles.nativeLayoutIconBtnActive,
+                          ]}
+                          onPress={handleToggleLayout}
+                          accessibilityRole="button"
+                          accessibilityLabel="Toggle Layout"
+                        >
+                          <LayoutGrid size={18} color={callLayout === 'SPOTLIGHT' ? '#38bdf8' : '#ffffff'} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          style={[
+                            styles.nativeActionIconBtn,
+                            isScreenSharing && styles.nativeScreenShareIconBtnActive,
+                          ]}
+                          onPress={toggleScreenShare}
+                          accessibilityRole="button"
+                          accessibilityLabel={isScreenSharing ? 'Stop Screen Share' : 'Start Screen Share'}
+                        >
+                          {isScreenSharing ? (
+                            <ScreenShareOff size={18} color="#ffffff" />
+                          ) : (
+                            <ScreenShare size={18} color="#ffffff" />
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
                 </View>
 
                 {/* Screen Share Active Banner */}
@@ -1342,5 +1500,38 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '600',
+  },
+  desktopBottomLayoutContainer: {
+    position: 'absolute',
+    bottom: 24,
+    right: 28,
+    zIndex: 9999,
+  },
+  desktopLayoutDockBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.90)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.20)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  desktopLayoutDockBtnActive: {
+    backgroundColor: 'rgba(56, 189, 248, 0.25)',
+    borderColor: '#38bdf8',
+  },
+  desktopLayoutDockText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  desktopLayoutDockTextActive: {
+    color: '#38bdf8',
   },
 });

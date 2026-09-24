@@ -362,9 +362,30 @@ class CometChatService {
   public leaveSession(): void {
     if (!this.isSupported()) return;
     try {
-      CometChatCallsSDK.leaveSession();
+      if (typeof CometChatCallsSDK?.leaveSession === 'function') {
+        CometChatCallsSDK.leaveSession();
+      } else if (typeof CometChatCallsSDK?.endSession === 'function') {
+        CometChatCallsSDK.endSession();
+      }
     } catch (error) {
       console.warn('[CometChat] Error leaving session:', error);
+    }
+  }
+
+  /**
+   * Set call layout (SPOTLIGHT or SIDEBAR/TILE)
+   */
+  public setLayout(layout: 'SPOTLIGHT' | 'SIDEBAR' | 'TILE'): void {
+    if (!this.isSupported()) return;
+    try {
+      const mode = layout === 'TILE' ? 'SIDEBAR' : layout;
+      if (typeof CometChatCallsSDK?.setLayout === 'function') {
+        CometChatCallsSDK.setLayout(mode);
+      } else if (typeof CometChatCallsSDK?.setMode === 'function') {
+        CometChatCallsSDK.setMode(mode);
+      }
+    } catch (error) {
+      console.warn('[CometChat] setLayout error:', error);
     }
   }
 

@@ -190,6 +190,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     const isGroup = isGroupCallRef.current;
     const currentType = callTypeRef.current;
 
+    cometchatService.leaveSession();
+
     if (!isGroup && user?.id && partner?.id) {
       logCallMessage({
         callerId: partner.id,
@@ -536,14 +538,15 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       })
       .on('broadcast', { event: 'call_rejected' }, ({ payload }: any) => {
         console.log('[CallProvider] Call was rejected:', payload);
-        if (sessionIdRef.current === payload.sessionId && !isGroupCallRef.current) {
+        if (!isGroupCallRef.current && (!payload?.sessionId || sessionIdRef.current === payload?.sessionId)) {
           callSoundService.stopAll();
+          cometchatService.leaveSession();
           resetCallState();
         }
       })
       .on('broadcast', { event: 'call_ended' }, ({ payload }: any) => {
         console.log('[CallProvider] Call was ended:', payload);
-        if (sessionIdRef.current === payload.sessionId && !isGroupCallRef.current) {
+        if (!isGroupCallRef.current && (!payload?.sessionId || sessionIdRef.current === payload?.sessionId)) {
           callSoundService.stopAll();
           cometchatService.leaveSession();
           resetCallState();

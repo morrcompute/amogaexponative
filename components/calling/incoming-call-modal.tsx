@@ -150,15 +150,26 @@ export function IncomingCallModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(10, 15, 29, 0.85)',
+    backgroundColor: 'rgba(10, 15, 29, 0.90)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
-    zIndex: 99999,
+    zIndex: 999999,
+    ...(Platform.OS === 'web'
+      ? ({
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100vw',
+          height: '100vh',
+        } as any)
+      : {}),
   },
   card: {
     width: '100%',
-    maxWidth: 380,
+    maxWidth: 400,
     backgroundColor: '#0f172a',
     borderRadius: 28,
     paddingVertical: 36,
