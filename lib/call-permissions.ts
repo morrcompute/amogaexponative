@@ -41,25 +41,49 @@ export async function requestCallPermissions(callType: 'audio' | 'video' = 'vide
   if (Platform.OS === 'web') {
     try {
       if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
-        console.log('[CallPermissions Web] Prompting browser for media permissions:', callType);
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: callType === 'video',
-        });
-        // Release the test tracks so the browser permission is recorded without locking the device
-        stream.getTracks().forEach((track) => {
-          try {
-            track.stop();
-          } catch (_) {}
-        });
+        console.log('[CallPermissions Web] Checking browser media permissions for:', callType);
+        let stream: any = null;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: callType === 'video',
+          });
+        } catch (firstErr: any) {
+          console.warn(
+            '[CallPermissions Web] Video+Audio permission prompt not granted, trying audio-only fallback:',
+            firstErr?.name || firstErr
+          );
+          // If video failed (e.g. system denied camera or no camera connected), fall back to audio
+          if (callType === 'video') {
+            try {
+              stream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+                video: false,
+              });
+            } catch (audioErr: any) {
+              console.warn('[CallPermissions Web] Audio-only fallback error:', audioErr?.name || audioErr);
+            }
+          }
+        }
+
+        if (stream) {
+          stream.getTracks().forEach((track: any) => {
+            try {
+              track.stop();
+            } catch (_) {}
+          });
+        }
+        // Always return true on web so pre-flight check doesn't reject incoming or outgoing calls.
+        // CometChat's in-call WebRTC engine manages in-session device permissions.
         return true;
       }
       return true;
     } catch (err: any) {
-      console.warn('[CallPermissions Web] Permission denied or device unavailable:', err);
-      return false;
+      console.warn('[CallPermissions Web] Error during permission check:', err);
+      return true;
     }
   }
+
 
   // iOS permissions are handled via Info.plist and system prompts
   return true;

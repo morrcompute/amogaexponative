@@ -1,13 +1,17 @@
 import { Platform } from 'react-native';
 
-// CometChat Calls configuration from environment variables
+// CometChat Calls configuration with production defaults for web/native deployments
 export const COMETCHAT_CONFIG = {
-  appId: process.env.EXPO_PUBLIC_COMETCHAT_APP_ID || '',
+  appId: process.env.EXPO_PUBLIC_COMETCHAT_APP_ID || '16836945a87e18e94',
   region: process.env.EXPO_PUBLIC_COMETCHAT_REGION || 'in',
-  authKey: process.env.EXPO_PUBLIC_COMETCHAT_AUTH_KEY || '',
-  restApiKey: process.env.EXPO_PUBLIC_COMETCHAT_REST_API_KEY || process.env.COMETCHAT_REST_API_KEY || '',
-  apiUrl: process.env.EXPO_PUBLIC_API_URL || '',
+  authKey: process.env.EXPO_PUBLIC_COMETCHAT_AUTH_KEY || '3bcd11bec07aad2099c398f67fa82393ded20593',
+  restApiKey:
+    process.env.EXPO_PUBLIC_COMETCHAT_REST_API_KEY ||
+    process.env.COMETCHAT_REST_API_KEY ||
+    'b9d95bcebc4d19aa12882cf7e82bfca5140ef25a',
+  apiUrl: process.env.EXPO_PUBLIC_API_URL || 'https://amoganativenew.vercel.app',
 };
+
 
 let CometChatCallsSDK: any = null;
 
@@ -47,6 +51,8 @@ export interface CometChatUser {
 class CometChatService {
   private isInitialized = false;
   private currentLoggedInUid: string | null = null;
+  private currentUserAuthToken: string | null = null;
+
 
   public isSupported(): boolean {
     return Boolean(CometChatCallsSDK);
@@ -202,7 +208,8 @@ class CometChatService {
       return { success: false, error: 'Calling SDK not loaded' };
     }
 
-    const effectiveAuthKey = authKey || COMETCHAT_CONFIG.authKey;
+    const effectiveAuthKey =
+      authKey || COMETCHAT_CONFIG.authKey || '3bcd11bec07aad2099c398f67fa82393ded20593';
 
     try {
       // If already logged in as this user, return existing user

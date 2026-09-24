@@ -842,37 +842,42 @@ export async function logCallMessage(params: {
     }
 
     // Insert copy for caller (direction: Sent)
-    await supabase.from('chat_messages').insert({
-      conversation_id: conversationId,
-      owner_user_id: callerId,
-      sender_user_id: callerId,
-      message: callerMsg,
-      message_type: 'call',
-      direction: 'Sent',
-      sent: true,
-      received: false,
-      created_at: now,
-      file_name: fileName,
-      duration: durationSeconds,
-    });
+    try {
+      await supabase.from('chat_messages').insert({
+        conversation_id: conversationId,
+        owner_user_id: callerId,
+        sender_user_id: callerId,
+        message: callerMsg,
+        message_type: 'call',
+        direction: 'Sent',
+        sent: true,
+        received: false,
+        created_at: now,
+        file_name: fileName,
+        duration: durationSeconds,
+      });
+    } catch (_) {}
 
     // Insert copy for callee (direction: Received)
-    await supabase.from('chat_messages').insert({
-      conversation_id: conversationId,
-      owner_user_id: calleeId,
-      sender_user_id: callerId,
-      message: calleeMsg,
-      message_type: 'call',
-      direction: 'Received',
-      sent: true,
-      received: false,
-      created_at: now,
-      file_name: fileName,
-      duration: durationSeconds,
-    });
+    try {
+      await supabase.from('chat_messages').insert({
+        conversation_id: conversationId,
+        owner_user_id: calleeId,
+        sender_user_id: callerId,
+        message: calleeMsg,
+        message_type: 'call',
+        direction: 'Received',
+        sent: true,
+        received: false,
+        created_at: now,
+        file_name: fileName,
+        duration: durationSeconds,
+      });
+    } catch (_) {}
   } catch (err) {
-    console.error('Error logging call message:', err);
+    console.warn('[ChatService] Error logging call message:', err);
   }
 }
+
 
 
