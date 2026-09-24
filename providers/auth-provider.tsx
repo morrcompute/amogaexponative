@@ -11,6 +11,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/lib/database.types';
 import { LocalChatService, saveLocalProfile, getLocalProfile } from '@/lib/local-db';
+import { cometchatService } from '@/lib/cometchat-service';
 
 interface AuthContextType {
   /** `null` once resolved and signed out; the session while signed in. */
@@ -206,11 +207,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    if (userId) {
-      await LocalChatService.clearUserCache(userId).catch(() => {});
-    }
-    await supabase.auth.signOut();
+    const uid = userId;
+    // 1. Immediately clear session & profile so UI routes to sign-in instantly with zero lag
+    setSession(null);
     setProfile(null);
+
+    // 2. Perform background cleanups without blocking the user
+    try {
+      cometchatService.logout().catch(() => {});
+      if (uid) {
+        LocalChatService.clearUserCache(uid).catch(() => {});
+      }
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (err) {
+      console.warn('[Auth] Error during signOut:', err);
+    }
   }, [userId]);
 
   const refreshProfile = useCallback(async () => {

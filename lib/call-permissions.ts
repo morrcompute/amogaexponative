@@ -38,6 +38,29 @@ export async function requestCallPermissions(callType: 'audio' | 'video' = 'vide
     }
   }
 
+  if (Platform.OS === 'web') {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+        console.log('[CallPermissions Web] Prompting browser for media permissions:', callType);
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: callType === 'video',
+        });
+        // Release the test tracks so the browser permission is recorded without locking the device
+        stream.getTracks().forEach((track) => {
+          try {
+            track.stop();
+          } catch (_) {}
+        });
+        return true;
+      }
+      return true;
+    } catch (err: any) {
+      console.warn('[CallPermissions Web] Permission denied or device unavailable:', err);
+      return false;
+    }
+  }
+
   // iOS permissions are handled via Info.plist and system prompts
   return true;
 }

@@ -111,6 +111,24 @@ export function ActiveCallModal({
   }, [visible, callState, pulseAnim]);
 
   const screenStreamRef = useRef<any>(null);
+  const localWebStreamRef = useRef<any>(null);
+  const webVideoRef = useRef<any>(null);
+  const webScreenVideoRef = useRef<any>(null);
+
+  // Stop web media stream and release tracks
+  const stopWebMedia = useCallback(() => {
+    if (localWebStreamRef.current) {
+      try {
+        const tracks = localWebStreamRef.current.getTracks ? localWebStreamRef.current.getTracks() : [];
+        tracks.forEach((t: any) => {
+          try {
+            t.stop();
+          } catch (_) {}
+        });
+      } catch (_) {}
+      localWebStreamRef.current = null;
+    }
+  }, []);
 
   // Stop screen sharing cleanly and release system media tracks
   const stopScreenShare = useCallback(() => {
@@ -223,14 +241,16 @@ export function ActiveCallModal({
   // Wrapper for ending call
   const handleEndCall = useCallback(async () => {
     stopScreenShare();
+    stopWebMedia();
     onEndCall();
-  }, [stopScreenShare, onEndCall]);
+  }, [stopScreenShare, stopWebMedia, onEndCall]);
 
   // Duration timer & cleanup during active call
   useEffect(() => {
     if (!visible || callState !== 'active') {
       setCallDuration(0);
       stopScreenShare();
+      stopWebMedia();
       return;
     }
 
@@ -241,8 +261,92 @@ export function ActiveCallModal({
     return () => {
       clearInterval(interval);
       stopScreenShare();
+      stopWebMedia();
     };
-  }, [visible, callState, stopScreenShare]);
+  }, [visible, callState, stopScreenShare, stopWebMedia]);
+
+  // Setup Web camera & mic stream when call becomes active on Web
+  useEffect(() => {
+    if (!visible || callState !== 'active' || Platform.OS !== 'web') {
+      stopWebMedia();
+      return;
+    }
+
+    let isMounted = true;
+    async function startWebMedia() {
+      try {
+        if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+          console.log('[ActiveCallModal Web] Initializing local media stream for call type:', callType);
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: callType === 'video',
+          });
+          if (!isMounted) {
+            stream.getTracks().forEach((t) => {
+              try { t.stop(); } catch (_) {}
+            });
+            return;
+          }
+          localWebStreamRef.current = stream;
+
+          // Apply current mute and video pause state
+          stream.getAudioTracks().forEach((t) => {
+            t.enabled = !isMuted;
+          });
+          stream.getVideoTracks().forEach((t) => {
+            t.enabled = !isVideoDisabled;
+          });
+
+          // Attach to live video element
+          if (webVideoRef.current) {
+            webVideoRef.current.srcObject = stream;
+            webVideoRef.current.play?.().catch(() => {});
+          }
+        }
+      } catch (err) {
+        console.warn('[ActiveCallModal Web] Could not acquire local media stream:', err);
+      }
+    }
+
+    startWebMedia();
+
+    return () => {
+      isMounted = false;
+      stopWebMedia();
+    };
+  }, [visible, callState, callType, stopWebMedia]);
+
+  // Sync mic mute state to web audio tracks
+  useEffect(() => {
+    if (Platform.OS === 'web' && localWebStreamRef.current) {
+      try {
+        localWebStreamRef.current.getAudioTracks?.().forEach((t: any) => {
+          t.enabled = !isMuted;
+        });
+      } catch (_) {}
+    }
+  }, [isMuted]);
+
+  // Sync video pause state to web video tracks
+  useEffect(() => {
+    if (Platform.OS === 'web' && localWebStreamRef.current) {
+      try {
+        localWebStreamRef.current.getVideoTracks?.().forEach((t: any) => {
+          t.enabled = !isVideoDisabled;
+        });
+      } catch (_) {}
+    }
+  }, [isVideoDisabled]);
+
+  // Sync web screen sharing video ref
+  useEffect(() => {
+    if (Platform.OS === 'web' && isScreenSharing && screenStreamRef.current && webScreenVideoRef.current) {
+      try {
+        webScreenVideoRef.current.srcObject = screenStreamRef.current;
+        webScreenVideoRef.current.play?.().catch(() => {});
+      } catch (_) {}
+    }
+  }, [isScreenSharing]);
 
   // CometChat native event listeners (session & screen share)
   useEffect(() => {
@@ -624,14 +728,59 @@ export function ActiveCallModal({
                   </ScrollView>
                 ) : (
                   <View style={styles.centerStage}>
-                    <View style={styles.bigAvatar}>
-                      <Text style={styles.bigAvatarText}>{initials}</Text>
-                    </View>
-                    <Text style={styles.connectedBadge}>Connected via CometChat</Text>
-                    {!isNativeSupported && (
-                      <Text style={styles.devNote}>
-                        (Native WebRTC active in EAS Dev Build. Previewing UI layout & signaling)
-                      </Text>
+                    {Platform.OS === 'web' && isScreenSharing && screenStreamRef.current ? (
+                      <View style={styles.webVideoContainer}>
+                        {React.createElement('video', {
+                          ref: webScreenVideoRef,
+                          autoPlay: true,
+                          playsInline: true,
+                          muted: true,
+                          style: {
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'contain',
+                            backgroundColor: '#000000',
+                            borderRadius: 16,
+                          },
+                        })}
+                        <View style={styles.webVideoBadge}>
+                          <Text style={styles.webVideoBadgeText}>Your Shared Screen</Text>
+                        </View>
+                      </View>
+                    ) : Platform.OS === 'web' && callType === 'video' && !isVideoDisabled ? (
+                      <View style={styles.webVideoContainer}>
+                        {React.createElement('video', {
+                          ref: webVideoRef,
+                          autoPlay: true,
+                          playsInline: true,
+                          muted: true, // Local preview muted to prevent audio feedback loop
+                          style: {
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            backgroundColor: '#0f172a',
+                            borderRadius: 16,
+                            transform: isCameraFront ? 'scaleX(-1)' : 'none',
+                          },
+                        })}
+                        <View style={styles.webVideoBadge}>
+                          <Text style={styles.webVideoBadgeText}>You (Live Camera)</Text>
+                        </View>
+                      </View>
+                    ) : (
+                      <>
+                        <View style={styles.bigAvatar}>
+                          <Text style={styles.bigAvatarText}>{initials}</Text>
+                        </View>
+                        <Text style={styles.connectedBadge}>
+                          {isNativeSupported ? 'Connected via CometChat' : 'Connected'}
+                        </Text>
+                        {Platform.OS !== 'web' && !isNativeSupported && (
+                          <Text style={styles.devNote}>
+                            (Native WebRTC active in EAS Dev Build. Previewing UI layout & signaling)
+                          </Text>
+                        )}
+                      </>
                     )}
                   </View>
                 )}
@@ -1090,5 +1239,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 16,
+  },
+  webVideoContainer: {
+    width: Math.min(SCREEN_WIDTH - 40, 560),
+    height: 380,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#0f172a',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  webVideoBadge: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  webVideoBadgeText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
