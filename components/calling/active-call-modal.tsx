@@ -60,6 +60,34 @@ export interface ActiveCallModalProps {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+// Immediately hide CometChat default header panel and participant list button on web so only our 3 custom icons show
+if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  const styleId = 'cometchat-hide-header-style';
+  if (!document.getElementById(styleId)) {
+    const styleEl = document.createElement('style');
+    styleEl.id = styleId;
+    styleEl.innerHTML = `
+      .cometchat-calls-header-container,
+      .cometchat-calls-header-actions,
+      .cometchat-calls-header-action-button,
+      .cometchat-calls-header-layout-dropdown,
+      [class*="cometchat-calls-header"],
+      [class*="header-action"],
+      [class*="header-container"],
+      [class*="participant-list-button"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        height: 0 !important;
+        width: 0 !important;
+        overflow: hidden !important;
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }
+}
+
 export function ActiveCallModal({
   visible,
   callState,
@@ -154,7 +182,29 @@ export function ActiveCallModal({
       defaultLayout: true,
       enableDefaultLayout: true,
       hideHeaderPanel: true,
+      ShowHeaderPanel: false,
       hideSwitchCameraButton: true,
+      ShowSwitchCameraButton: false,
+      hideParticipantListButton: true,
+      ShowParticipantListButton: false,
+      hideChatButton: true,
+      ShowChatButton: false,
+      hideShareInviteButton: true,
+      ShowShareInviteButton: false,
+      // ── Custom CSS to completely remove CometChat internal top header & participant icons ──
+      customCSS: `
+        .cometchat-calls-header-container,
+        .cometchat-calls-header-actions,
+        .cometchat-calls-header-action-button,
+        [class*="header-action"],
+        [class*="header-container"],
+        [class*="participant-list-button"] {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+        }
+      `,
       // ── Desktop Layout & Controls (all docked at bottom) ─────────────────
       hideChangeLayoutButton: false,
       ShowSwitchModeButton: true,
@@ -318,6 +368,27 @@ export function ActiveCallModal({
           (typeof document !== 'undefined' ? document.getElementById('cometchat-web-call-container') : null);
 
         if (container) {
+          if (typeof document !== 'undefined') {
+            const styleId = 'cometchat-hide-header-style';
+            if (!document.getElementById(styleId)) {
+              const styleEl = document.createElement('style');
+              styleEl.id = styleId;
+              styleEl.innerHTML = `
+                .cometchat-calls-header-container,
+                .cometchat-calls-header-actions,
+                .cometchat-calls-header-action-button,
+                [class*="header-action"],
+                [class*="header-container"],
+                [class*="participant-list-button"] {
+                  display: none !important;
+                  visibility: hidden !important;
+                  opacity: 0 !important;
+                  pointer-events: none !important;
+                }
+              `;
+              document.head.appendChild(styleEl);
+            }
+          }
           console.log('[WebCall] Mounting CometChat WebRTC conference into container...');
           const res = await cometchatService.startWebSession(callToken, sessionSettings, container);
           if (!res.success && isMounted) {
