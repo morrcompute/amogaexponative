@@ -256,7 +256,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       });
 
       // 4. Generate token for this session
-      const tokenRes = await cometchatService.generateToken(activeSession);
+      const tokenRes = await cometchatService.generateToken(activeSession, user.id);
       if (tokenRes.token) {
         setCallToken(tokenRes.token);
       } else if (cometchatService.isSupported()) {
@@ -326,7 +326,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           avatar: avatarUrl,
         });
 
-        const tokenRes = await cometchatService.generateToken(newSessionId);
+        const tokenRes = await cometchatService.generateToken(newSessionId, user.id);
         if (tokenRes.token) {
           setCallToken(tokenRes.token);
         }
@@ -398,7 +398,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           avatar: avatarUrl,
         });
 
-        const tokenRes = await cometchatService.generateToken(newSessionId);
+        const tokenRes = await cometchatService.generateToken(newSessionId, user.id);
         if (tokenRes.token) {
           setCallToken(tokenRes.token);
         }
@@ -470,7 +470,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           avatar: avatarUrl,
         });
 
-        const tokenRes = await cometchatService.generateToken(targetSessionId);
+        const tokenRes = await cometchatService.generateToken(targetSessionId, user.id);
         if (tokenRes.token) {
           setCallToken(tokenRes.token);
         }
@@ -524,7 +524,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           await callSoundService.stopAll();
 
           if (!callToken && sessionIdRef.current) {
-            const tokenRes = await cometchatService.generateToken(sessionIdRef.current);
+            const tokenRes = await cometchatService.generateToken(sessionIdRef.current, user?.id);
             if (tokenRes.token) {
               setCallToken(tokenRes.token);
             }

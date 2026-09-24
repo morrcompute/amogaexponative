@@ -211,6 +211,8 @@ class CometChatService {
     const effectiveAuthKey =
       authKey || COMETCHAT_CONFIG.authKey || '3bcd11bec07aad2099c398f67fa82393ded20593';
 
+    this.currentLoggedInUid = uid;
+
     try {
       // If already logged in as this user, return existing user
       if (
@@ -219,34 +221,25 @@ class CometChatService {
         CometChatCallsSDK.isUserLoggedIn()
       ) {
         const user = CometChatCallsSDK.getLoggedInUser();
-        return { success: true, user: user || { uid } };
+        if (user) {
+          this.currentUserAuthToken = user.authToken || this.currentUserAuthToken;
+          return { success: true, user };
+        }
       }
 
       let user: any;
       try {
-        if (effectiveAuthKey) {
-          user = await CometChatCallsSDK.login(uid, effectiveAuthKey);
-        } else {
-          user = await CometChatCallsSDK.login(uid);
-        }
+        user = await CometChatCallsSDK.login(uid, effectiveAuthKey);
       } catch (loginErr: any) {
-        // If user does not exist in CometChat, try provisioning them and retrying login
-        const isNotFound =
-          loginErr?.errorCode === 'ERR_UID_NOT_FOUND' ||
-          loginErr?.code === 'ERR_UID_NOT_FOUND' ||
-          loginErr?.message?.includes('not exist');
-
-        if (isNotFound) {
-          console.log('[CometChat] UID not found, attempting auto-provisioning for:', uid);
-          await this.syncUser(uid, userDetails?.name, userDetails?.avatar);
-          if (effectiveAuthKey) {
-            user = await CometChatCallsSDK.login(uid, effectiveAuthKey);
-          } else {
-            user = await CometChatCallsSDK.login(uid);
-          }
-        } else {
-          throw loginErr;
-        }
+        console.warn(
+          '[CometChat] Initial login failed, auto-provisioning user on CometChat directory:',
+          uid,
+          loginErr?.errorDescription || loginErr?.message || loginErr
+        );
+        // Provision the user in CometChat directly via REST API
+        await this.syncUser(uid, userDetails?.name, userDetails?.avatar);
+        // Retry login with authKey
+        user = await CometChatCallsSDK.login(uid, effectiveAuthKey);
       }
 
       this.currentLoggedInUid = uid;
@@ -254,7 +247,7 @@ class CometChatService {
       console.log('[CometChat] Logged in successfully:', uid);
       return { success: true, user };
     } catch (error: any) {
-      console.error('[CometChat] Login failed:', error?.message || error);
+      console.error('[CometChat] Login failed:', error?.errorDescription || error?.message || error);
       return { success: false, error };
     }
   }
@@ -274,13 +267,19 @@ class CometChatService {
   }
 
   /**
-   * Generate token for a call session
+   * Generate token for a call session with REST API fallback
    */
   public async generateToken(
-    sessionId: string
+    sessionId: string,
+    fallbackUid?: string
   ): Promise<{ success: boolean; token?: string; error?: any }> {
     const { appId, region, restApiKey, authKey } = COMETCHAT_CONFIG;
     const effectiveKey = restApiKey || authKey;
+    const uid = fallbackUid || this.currentLoggedInUid;
+
+    if (uid && !this.currentLoggedInUid) {
+      this.currentLoggedInUid = uid;
+    }
 
     // 1. Try SDK generateToken first if supported
     if (this.isSupported() && typeof CometChatCallsSDK?.generateToken === 'function') {
@@ -292,20 +291,23 @@ class CometChatService {
           return { success: true, token: response.token };
         }
       } catch (error: any) {
-        console.warn('[CometChat] SDK generateToken failed, trying REST API fallback:', error?.message || error);
+        console.warn(
+          '[CometChat] SDK generateToken failed, trying REST API fallback:',
+          error?.errorDescription || error?.message || error
+        );
       }
     }
 
     // 2. Direct REST API token generation fallback
-    if (appId && this.currentLoggedInUid) {
+    if (appId && uid && effectiveKey) {
       try {
-        console.log('[CometChat] Generating call token via REST API fallback for session:', sessionId);
+        console.log('[CometChat] Generating call token via REST API fallback for session:', sessionId, 'uid:', uid);
 
         // Ensure we have an authToken for the user
         let userAuthToken = this.currentUserAuthToken;
-        if (!userAuthToken && effectiveKey) {
+        if (!userAuthToken) {
           try {
-            const authUrl = `https://${appId}.api-${region.toLowerCase()}.cometchat.io/v3/users/${this.currentLoggedInUid}/auth_tokens`;
+            const authUrl = `https://${appId}.api-${region.toLowerCase()}.cometchat.io/v3/users/${uid}/auth_tokens`;
             const authRes = await fetch(authUrl, {
               method: 'POST',
               headers: {
@@ -350,6 +352,7 @@ class CometChatService {
 
     return { success: false, error: 'Could not generate call token from SDK or REST API.' };
   }
+
 
 
 

@@ -260,23 +260,31 @@ export function ActiveCallModal({
     if (Platform.OS !== 'web' || callState !== 'active' || !callToken) return;
 
     let isMounted = true;
+    let retries = 0;
+
     const mountCall = async () => {
-      // Short tick to ensure DOM element is mounted
-      await new Promise((resolve) => setTimeout(resolve, 80));
-      if (!isMounted) return;
+      while (isMounted && retries < 15) {
+        const container =
+          webCallContainerRef.current ||
+          (typeof document !== 'undefined' ? document.getElementById('cometchat-web-call-container') : null);
 
-      const container =
-        webCallContainerRef.current ||
-        (typeof document !== 'undefined' ? document.getElementById('cometchat-web-call-container') : null);
-
-      if (container) {
-        console.log('[WebCall] Mounting CometChat WebRTC conference into container...');
-        const res = await cometchatService.startWebSession(callToken, sessionSettings, container);
-        if (!res.success && isMounted) {
-          console.warn('[WebCall] Failed to start web session:', res.error);
+        if (container) {
+          console.log('[WebCall] Mounting CometChat WebRTC conference into container...');
+          const res = await cometchatService.startWebSession(callToken, sessionSettings, container);
+          if (!res.success && isMounted) {
+            console.warn('[WebCall] Failed to start web session:', res.error);
+          } else if (isMounted) {
+            console.log('[WebCall] WebRTC session mounted successfully');
+          }
+          return;
         }
-      } else {
-        console.warn('[WebCall] Container element not found for CometChat WebRTC conference');
+
+        retries++;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      if (isMounted) {
+        console.warn('[WebCall] Container element not found after retries');
       }
     };
 
@@ -290,6 +298,7 @@ export function ActiveCallModal({
       }
     };
   }, [callState, callToken, sessionSettings]);
+
 
 
 
@@ -785,7 +794,18 @@ export function ActiveCallModal({
                   </ScrollView>
                 ) : (
                   <View style={styles.centerStage}>
-                    {Platform.OS === 'web' && isScreenSharing && screenStreamRef.current ? (
+                    {Platform.OS === 'web' && !callToken ? (
+                      <View style={{ alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+                        <ActivityIndicator size="large" color="#38bdf8" />
+                        <Text style={{ color: '#ffffff', fontSize: 17, fontWeight: '600', marginTop: 16 }}>
+                          Connecting Call...
+                        </Text>
+                        <Text style={{ color: '#94a3b8', fontSize: 13, marginTop: 6, textAlign: 'center' }}>
+                          Securing WebRTC audio & video conference
+                        </Text>
+                      </View>
+                    ) : Platform.OS === 'web' && isScreenSharing && screenStreamRef.current ? (
+
                       <View style={styles.webVideoContainer}>
                         {React.createElement('video', {
                           ref: webScreenVideoRef,
