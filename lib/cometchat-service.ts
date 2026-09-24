@@ -266,6 +266,86 @@ class CometChatService {
   }
 
   /**
+   * Switch between front and back camera during a call.
+   */
+  public switchCamera(): void {
+    if (!this.isSupported()) return;
+    try {
+      CometChatCallsSDK.switchCamera();
+    } catch (error) {
+      console.warn('[CometChat] switchCamera error:', error);
+    }
+  }
+
+  /**
+   * Mute or unmute local audio during the call.
+   */
+  public muteAudio(mute: boolean): void {
+    if (!this.isSupported()) return;
+    try {
+      CometChatCallsSDK.muteAudio(mute);
+    } catch (error) {
+      console.warn('[CometChat] muteAudio error:', error);
+    }
+  }
+
+  /**
+   * Toggle local audio mute state.
+   */
+  public toggleAudio(): void {
+    if (!this.isSupported()) return;
+    try {
+      CometChatCallsSDK.toggleAudio?.() ?? CometChatCallsSDK.muteAudio?.();
+    } catch (error) {
+      console.warn('[CometChat] toggleAudio error:', error);
+    }
+  }
+
+  /**
+   * Toggle local video pause/resume state.
+   */
+  public toggleVideo(): void {
+    if (!this.isSupported()) return;
+    try {
+      CometChatCallsSDK.toggleVideo?.() ?? CometChatCallsSDK.pauseVideo?.();
+    } catch (error) {
+      console.warn('[CometChat] toggleVideo error:', error);
+    }
+  }
+
+  /**
+   * Start native screen sharing via CometChat Calls WebRTC engine
+   */
+  public startScreenSharing(): void {
+    if (!this.isSupported()) return;
+    try {
+      if (typeof CometChatCallsSDK?.startScreenSharing === 'function') {
+        CometChatCallsSDK.startScreenSharing();
+      } else {
+        console.warn('[CometChat] startScreenSharing is not available on CometChatCalls');
+      }
+    } catch (error) {
+      console.warn('[CometChat] startScreenSharing error:', error);
+    }
+  }
+
+  /**
+   * Stop native screen sharing via CometChat Calls WebRTC engine
+   */
+  public stopScreenSharing(): void {
+    if (!this.isSupported()) return;
+    try {
+      if (typeof CometChatCallsSDK?.stopScreenSharing === 'function') {
+        CometChatCallsSDK.stopScreenSharing();
+      } else {
+        console.warn('[CometChat] stopScreenSharing is not available on CometChatCalls');
+      }
+    } catch (error) {
+      console.warn('[CometChat] stopScreenSharing error:', error);
+    }
+  }
+
+  /**
    * Add a call event listener with optional AbortSignal
    */
   public addEventListener(
@@ -281,3 +361,4 @@ class CometChatService {
 }
 
 export const cometchatService = new CometChatService();
+

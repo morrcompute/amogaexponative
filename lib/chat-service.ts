@@ -300,128 +300,130 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
 }
 
 /**
- * Upload attachment to Supabase Storage 'chat-files' bucket.
- *
- * Upload strategy (in order):
- *   1. base64 → ArrayBuffer  (works on all platforms when FileSystem read succeeds)
- *   2. fetch(fileUri) → Blob  (works on web & native when the URI is readable)
- *   3. data: URI fallback     (always viewable, even without Supabase)
+ * Upload attachment to Supabase Storage 'amogachatfiles' bucket (with 'chat-files' fallback).
+ * Organized into sub-folders: Videos, Voice, Images, Files, Links.
  */
 export async function uploadChatAttachment(
   fileUri: string,
   fileName: string,
   mimeType: string,
-  base64Data?: string
+  base64Data?: string,
+  targetFolder?: 'Videos' | 'Voice' | 'Images' | 'Files' | 'Links' | string
 ): Promise<string | null> {
   try {
     const ext = fileName.split('.').pop() || 'dat';
     const cleanName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
-    const filePath = `attachments/${cleanName}`;
-
-    // ── Tier 0: Native FileSystem streaming (Android & iOS) ──────────────────
-    // Streams content:// and file:// directly into Supabase Storage endpoint
-    if (Platform.OS !== 'web' && fileUri && (fileUri.startsWith('file:') || fileUri.startsWith('content:'))) {
-      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-      const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-      const FileSystem = getFileSystemModule();
-
-      if (FileSystem && supabaseUrl && supabaseKey) {
-        try {
-          const uploadEndpoint = `${supabaseUrl}/storage/v1/object/chat-files/${filePath}`;
-          const uploadRes = await FileSystem.uploadAsync(uploadEndpoint, fileUri, {
-            headers: {
-              Authorization: `Bearer ${supabaseKey}`,
-              apikey: supabaseKey,
-              'Content-Type': mimeType || 'application/octet-stream',
-            },
-            httpMethod: 'POST',
-            uploadType: FileSystem.FileSystemUploadType?.BINARY_CONTENT || 0,
-          });
-
-          if (uploadRes && uploadRes.status >= 200 && uploadRes.status < 300) {
-            const { data: urlData } = supabase.storage
-              .from('chat-files')
-              .getPublicUrl(filePath);
-            if (urlData?.publicUrl) {
-              console.log('[upload] Native FileSystem.uploadAsync success:', urlData.publicUrl);
-              return urlData.publicUrl;
-            }
-          } else if (uploadRes) {
-            console.warn('[upload] Native FileSystem.uploadAsync response:', uploadRes.status, uploadRes.body);
-          }
-        } catch (nativeErr) {
-          console.warn('[upload] Native FileSystem.uploadAsync error:', nativeErr);
-        }
-      }
-
-      // If uploadAsync wasn't successful, try reading file bytes into base64Data
-      if (!base64Data && FileSystem) {
-        try {
-          base64Data = await FileSystem.readAsStringAsync(fileUri, {
-            encoding: FileSystem.EncodingType?.Base64 || 'base64',
-          });
-        } catch (fsReadErr) {
-          console.warn('[upload] FileSystem.readAsStringAsync error:', fsReadErr);
-        }
-      }
+    
+    // Auto-detect folder if not explicitly specified
+    let folder = targetFolder;
+    if (!folder) {
+      if (mimeType.startsWith('image/')) folder = 'Images';
+      else if (mimeType.startsWith('video/')) folder = 'Videos';
+      else if (mimeType.startsWith('audio/')) folder = 'Voice';
+      else folder = 'Files';
     }
 
-    // ── Tier 1: base64 → ArrayBuffer upload ──────────────────────────────────
-    if (base64Data) {
-      try {
-        const uploadBody = base64ToArrayBuffer(base64Data);
-        const { error } = await supabase.storage
-          .from('chat-files')
-          .upload(filePath, uploadBody, {
-            contentType: mimeType || 'application/octet-stream',
-            upsert: true,
-          });
+    const filePath = `${folder}/${cleanName}`;
+    const bucketsToTry = ['amogachatfiles', 'chat-files'];
 
-        if (!error) {
-          const { data: urlData } = supabase.storage
-            .from('chat-files')
-            .getPublicUrl(filePath);
-          if (urlData?.publicUrl) {
-            console.log('[upload] Tier-1 (base64) success:', urlData.publicUrl);
-            return urlData.publicUrl;
-          }
-        } else {
-          console.warn('[upload] Tier-1 storage error:', error.message);
-        }
-      } catch (tier1Err) {
-        console.warn('[upload] Tier-1 exception:', tier1Err);
-      }
-    }
+    for (const bucket of bucketsToTry) {
+      // ── Tier 0: Native FileSystem streaming (Android & iOS) ──────────────────
+      if (Platform.OS !== 'web' && fileUri && (fileUri.startsWith('file:') || fileUri.startsWith('content:'))) {
+        const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+        const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+        const FileSystem = getFileSystemModule();
 
-    // ── Tier 2: fetch(fileUri) → Blob upload ─────────────────────────────────
-    if (fileUri) {
-      try {
-        const response = await fetch(fileUri);
-        if (response.ok) {
-          const blob = await response.blob();
-          if (blob.size > 0) {
-            const { error } = await supabase.storage
-              .from('chat-files')
-              .upload(filePath, blob, {
-                contentType: mimeType || blob.type || 'application/octet-stream',
-                upsert: true,
-              });
+        if (FileSystem && supabaseUrl && supabaseKey) {
+          try {
+            const uploadEndpoint = `${supabaseUrl}/storage/v1/object/${bucket}/${filePath}`;
+            const uploadRes = await FileSystem.uploadAsync(uploadEndpoint, fileUri, {
+              headers: {
+                Authorization: `Bearer ${supabaseKey}`,
+                apikey: supabaseKey,
+                'Content-Type': mimeType || 'application/octet-stream',
+              },
+              httpMethod: 'POST',
+              uploadType: FileSystem.FileSystemUploadType?.BINARY_CONTENT || 0,
+            });
 
-            if (!error) {
+            if (uploadRes && uploadRes.status >= 200 && uploadRes.status < 300) {
               const { data: urlData } = supabase.storage
-                .from('chat-files')
+                .from(bucket)
                 .getPublicUrl(filePath);
               if (urlData?.publicUrl) {
-                console.log('[upload] Tier-2 (fetch/blob) success:', urlData.publicUrl);
+                console.log(`[upload] Native FileSystem success (${bucket}):`, urlData.publicUrl);
                 return urlData.publicUrl;
               }
-            } else {
-              console.warn('[upload] Tier-2 storage error:', error.message);
             }
+          } catch (nativeErr) {
+            console.warn(`[upload] Native FileSystem error on ${bucket}:`, nativeErr);
           }
         }
-      } catch (tier2Err) {
-        console.warn('[upload] Tier-2 exception:', tier2Err);
+
+        if (!base64Data && FileSystem) {
+          try {
+            base64Data = await FileSystem.readAsStringAsync(fileUri, {
+              encoding: FileSystem.EncodingType?.Base64 || 'base64',
+            });
+          } catch (fsReadErr) {
+            console.warn('[upload] FileSystem.readAsStringAsync error:', fsReadErr);
+          }
+        }
+      }
+
+      // ── Tier 1: base64 → ArrayBuffer upload ──────────────────────────────────
+      if (base64Data) {
+        try {
+          const uploadBody = base64ToArrayBuffer(base64Data);
+          const { error } = await supabase.storage
+            .from(bucket)
+            .upload(filePath, uploadBody, {
+              contentType: mimeType || 'application/octet-stream',
+              upsert: true,
+            });
+
+          if (!error) {
+            const { data: urlData } = supabase.storage
+              .from(bucket)
+              .getPublicUrl(filePath);
+            if (urlData?.publicUrl) {
+              console.log(`[upload] Tier-1 success (${bucket}):`, urlData.publicUrl);
+              return urlData.publicUrl;
+            }
+          }
+        } catch (tier1Err) {
+          console.warn(`[upload] Tier-1 exception on ${bucket}:`, tier1Err);
+        }
+      }
+
+      // ── Tier 2: fetch(fileUri) → Blob upload ─────────────────────────────────
+      if (fileUri) {
+        try {
+          const response = await fetch(fileUri);
+          if (response.ok) {
+            const blob = await response.blob();
+            if (blob.size > 0) {
+              const { error } = await supabase.storage
+                .from(bucket)
+                .upload(filePath, blob, {
+                  contentType: mimeType || blob.type || 'application/octet-stream',
+                  upsert: true,
+                });
+
+              if (!error) {
+                const { data: urlData } = supabase.storage
+                  .from(bucket)
+                  .getPublicUrl(filePath);
+                if (urlData?.publicUrl) {
+                  console.log(`[upload] Tier-2 success (${bucket}):`, urlData.publicUrl);
+                  return urlData.publicUrl;
+                }
+              }
+            }
+          }
+        } catch (tier2Err) {
+          console.warn(`[upload] Tier-2 exception on ${bucket}:`, tier2Err);
+        }
       }
     }
 
@@ -431,13 +433,10 @@ export async function uploadChatAttachment(
       return `data:${mimeType || 'application/octet-stream'};base64,${base64Data}`;
     }
 
-    // Fallback: If on native, return fileUri directly so local media can still render
     if (fileUri) {
-      console.warn('[upload] Returning local fileUri as last resort');
       return fileUri;
     }
 
-    console.error('[upload] All upload tiers failed');
     return null;
   } catch (err) {
     console.warn('[upload] uploadChatAttachment error:', err);

@@ -556,6 +556,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     };
   }, [user?.id, callState, callToken, resetCallState]);
 
+  const currentUserMobile =
+    profile?.mobile || (user as any)?.phone || user?.user_metadata?.mobile || user?.email?.split('@')[0] || 'user';
+
   return (
     <CallContext.Provider
       value={{
@@ -594,11 +597,15 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         callState={callState === 'outgoing' ? 'outgoing' : 'active'}
         callType={callType}
         partnerName={partnerInfo?.name || 'Call'}
+        partnerId={partnerInfo?.id}
         callToken={callToken}
         sessionId={sessionId || ''}
         isGroupCall={isGroupCall}
         groupName={groupInfo?.name}
         participantCount={groupInfo?.memberCount}
+        currentUserId={user?.id}
+        currentUserMobile={currentUserMobile}
+        conversationId={isGroupCall ? groupInfo?.id : undefined}
         onEndCall={endCall}
       />
     </CallContext.Provider>

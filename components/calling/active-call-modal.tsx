@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Modal,
   StyleSheet,
@@ -9,6 +9,8 @@ import {
   Dimensions,
   Platform,
   ScrollView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -22,6 +24,9 @@ import {
   ScreenShareOff,
   MonitorUp,
   Volume2,
+  SwitchCamera,
+  FlipHorizontal2,
+  LayoutGrid,
 } from 'lucide-react-native';
 import { cometchatService } from '../../lib/cometchat-service';
 
@@ -39,6 +44,7 @@ export interface ActiveCallModalProps {
   callState: 'outgoing' | 'active';
   callType: 'audio' | 'video';
   partnerName: string;
+  partnerId?: string;
   callToken: string | null;
   sessionId: string;
   onEndCall: () => void;
@@ -46,6 +52,9 @@ export interface ActiveCallModalProps {
   groupName?: string;
   participantCount?: number;
   participants?: CallParticipant[];
+  currentUserId?: string;
+  currentUserMobile?: string;
+  conversationId?: string;
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -55,6 +64,7 @@ export function ActiveCallModal({
   callState,
   callType,
   partnerName,
+  partnerId,
   callToken,
   sessionId,
   onEndCall,
@@ -62,6 +72,9 @@ export function ActiveCallModal({
   groupName,
   participantCount = 1,
   participants = [],
+  currentUserId,
+  currentUserMobile,
+  conversationId,
 }: ActiveCallModalProps) {
   const insets = useSafeAreaInsets();
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -69,6 +82,8 @@ export function ActiveCallModal({
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoDisabled, setIsVideoDisabled] = useState(callType === 'audio');
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [isCameraFront, setIsCameraFront] = useState(true); // track which camera is active
+  const [callLayout, setCallLayout] = useState<'TILE' | 'SPOTLIGHT'>('TILE');
 
   // Pulse animation for outgoing calling screen
   useEffect(() => {
@@ -95,11 +110,127 @@ export function ActiveCallModal({
     };
   }, [visible, callState, pulseAnim]);
 
-  // Duration timer during active call
+  const screenStreamRef = useRef<any>(null);
+
+  // Stop screen sharing cleanly and release system media tracks
+  const stopScreenShare = useCallback(() => {
+    try {
+      if (Platform.OS !== 'web' && cometchatService.isSupported()) {
+        console.log('[ScreenShare] Stopping native CometChat screen sharing...');
+        cometchatService.stopScreenSharing();
+      }
+      if (screenStreamRef.current) {
+        const tracks = screenStreamRef.current.getTracks ? screenStreamRef.current.getTracks() : [];
+        tracks.forEach((track: any) => {
+          try {
+            track.stop();
+          } catch {
+            // ignore
+          }
+        });
+        screenStreamRef.current = null;
+      }
+    } catch (err) {
+      console.warn('[ScreenShare] Error stopping stream tracks:', err);
+    }
+    setIsScreenSharing(false);
+  }, []);
+
+  // Start screen sharing with CometChat WebRTC conference engine or Web MediaDevices
+  const startScreenShare = useCallback(async () => {
+    try {
+      if (Platform.OS !== 'web' && cometchatService.isSupported()) {
+        console.log('[ScreenShare] Starting native CometChat screen sharing via Calls SDK...');
+        cometchatService.startScreenSharing();
+        // The SDK onScreenShareStarted event listener will update isScreenSharing to true
+        return;
+      }
+
+      // Web / Browser environment
+      if (Platform.OS === 'web') {
+        const nav = typeof navigator !== 'undefined' ? (navigator as any) : null;
+        if (nav && nav.mediaDevices && nav.mediaDevices.getDisplayMedia) {
+          console.log('[ScreenShare] Requesting browser getDisplayMedia...');
+          const stream = await nav.mediaDevices.getDisplayMedia({
+            video: true,
+            audio: false,
+          });
+          if (stream) {
+            screenStreamRef.current = stream;
+            setIsScreenSharing(true);
+
+            // Listen for track ending (e.g. user clicks "Stop sharing" in browser banner)
+            const videoTracks = stream.getVideoTracks ? stream.getVideoTracks() : [];
+            if (videoTracks.length > 0) {
+              videoTracks[0].onended = () => {
+                console.log('[ScreenShare] Browser screen share track ended');
+                stopScreenShare();
+              };
+            }
+          }
+        } else {
+          Alert.alert('Not Supported', 'Screen sharing is not supported in this browser.');
+        }
+        return;
+      }
+
+      // Mobile environment when native calling SDK is not compiled in
+      Alert.alert(
+        '📺 Screen Share',
+        'Screen sharing requires an EAS build with native calling support.',
+        [{ text: 'OK', style: 'default' }]
+      );
+    } catch (error: any) {
+      console.warn('[ScreenShare] Error starting screen share:', error);
+      setIsScreenSharing(false);
+      const errorMsg = error?.message || String(error || '');
+      if (
+        !errorMsg.toLowerCase().includes('cancel') &&
+        !errorMsg.toLowerCase().includes('denied') &&
+        !errorMsg.toLowerCase().includes('abort')
+      ) {
+        Alert.alert('Screen Share Error', 'Unable to start screen capture: ' + errorMsg);
+      }
+    }
+  }, [stopScreenShare]);
+
+
+  const toggleScreenShare = useCallback(() => {
+    if (isScreenSharing) {
+      stopScreenShare();
+    } else {
+      startScreenShare();
+    }
+  }, [isScreenSharing, startScreenShare, stopScreenShare]);
+
+  // CometChat camera flip
+  const handleSwitchCamera = useCallback(() => {
+    cometchatService.switchCamera();
+    setIsCameraFront((prev) => !prev);
+  }, []);
+
+  // Layout toggle (TILE <-> SPOTLIGHT)
+  const handleToggleLayout = useCallback(() => {
+    setCallLayout((prev) => (prev === 'TILE' ? 'SPOTLIGHT' : 'TILE'));
+  }, []);
+
+  // CometChat mic mute toggle
+  const handleToggleMic = useCallback(() => {
+    cometchatService.toggleAudio();
+    setIsMuted((prev) => !prev);
+  }, []);
+
+  // Wrapper for ending call
+  const handleEndCall = useCallback(async () => {
+    stopScreenShare();
+    onEndCall();
+  }, [stopScreenShare, onEndCall]);
+
+  // Duration timer & cleanup during active call
   useEffect(() => {
     if (!visible || callState !== 'active') {
       setCallDuration(0);
-      setIsScreenSharing(false);
+      stopScreenShare();
       return;
     }
 
@@ -107,78 +238,87 @@ export function ActiveCallModal({
       setCallDuration((prev) => prev + 1);
     }, 1000);
 
-    return () => clearInterval(interval);
-  }, [visible, callState]);
+    return () => {
+      clearInterval(interval);
+      stopScreenShare();
+    };
+  }, [visible, callState, stopScreenShare]);
 
-  // CometChat native event listeners
+  // CometChat native event listeners (session & screen share)
   useEffect(() => {
     if (!visible || callState !== 'active' || !cometchatService.isSupported()) return;
 
     const controller = new AbortController();
     const { signal } = controller;
 
-    cometchatService.addEventListener(
-      'onSessionLeft',
-      () => {
-        console.log('[CometChat] Session left event received');
-        onEndCall();
-      },
-      { signal }
-    );
+    cometchatService.addEventListener('onSessionLeft', () => {
+      console.log('[CometChat] Session left');
+      handleEndCall();
+    }, { signal });
 
-    cometchatService.addEventListener(
-      'onLeaveSessionButtonClicked',
-      () => {
-        console.log('[CometChat] Leave button clicked');
-        cometchatService.leaveSession();
-        onEndCall();
-      },
-      { signal }
-    );
+    cometchatService.addEventListener('onLeaveSessionButtonClicked', () => {
+      console.log('[CometChat] Leave button clicked');
+      cometchatService.leaveSession();
+      handleEndCall();
+    }, { signal });
 
-    cometchatService.addEventListener(
-      'onParticipantLeft',
-      (participant: any) => {
-        console.log('[CometChat] Participant left:', participant?.name);
-      },
-      { signal }
-    );
+    cometchatService.addEventListener('onSessionTimedOut', () => {
+      console.log('[CometChat] Session timed out');
+      handleEndCall();
+    }, { signal });
 
-    cometchatService.addEventListener(
-      'onSessionTimedOut',
-      () => {
-        console.log('[CometChat] Session timed out');
-        onEndCall();
-      },
-      { signal }
-    );
+    // ── Screen share events ───────────────────────────────────────────────────
+    cometchatService.addEventListener('onScreenShareStarted', () => {
+      setIsScreenSharing(true);
+    }, { signal });
+
+    cometchatService.addEventListener('onScreenShareStopped', () => {
+      setIsScreenSharing(false);
+    }, { signal });
+
+    cometchatService.addEventListener('onParticipantStartedScreenShare', () => {
+      setIsScreenSharing(true);
+    }, { signal });
+
+    cometchatService.addEventListener('onParticipantStoppedScreenShare', () => {
+      setIsScreenSharing(false);
+    }, { signal });
 
     return () => {
       controller.abort();
     };
-  }, [visible, callState, onEndCall]);
+  }, [visible, callState, handleEndCall, conversationId, currentUserId, partnerId, callType]);
 
-  // Memoize sessionSettings with group calling & screen sharing features enabled
+
+  // Memoize sessionSettings — using CometChat native recording & screen sharing
   const sessionSettings = useMemo(() => {
     return {
       sessionType: callType === 'audio' ? 'VOICE' : 'VIDEO',
       isAudioOnly: callType === 'audio',
-      layout: 'TILE',
+      layout: callLayout,
       defaultLayout: true,
+      // Hide CometChat internal header panel so custom 4-icon top bar does not collide
+      hideHeaderPanel: true,
+      hideSwitchCameraButton: true,
+      hideChangeLayoutButton: true,
+      // ── Screen Sharing (CometChat Native) ─────────────────────────────────
       isDesktopSharingEnabled: true,
+      hideScreenSharingButton: false,       // correct SDK prop (with "ing")
       ShowScreenShareButton: true,
       hideScreenShareButton: false,
-      startScreenSharing: false,
+      // ── Recording Disabled ────────────────────────────────────────────────
+      hideRecordingButton: true,
+      ShowRecordingButton: false,
+      // ── Call Controls ──────────────────────────────────────────────────────
       hideLeaveSessionButton: false,
       ShowEndCallButton: true,
       hideToggleAudioButton: false,
       ShowMuteAudioButton: true,
       hideToggleVideoButton: callType === 'audio',
       ShowPauseVideoButton: callType === 'video',
-      hideSwitchCameraButton: callType === 'audio',
-      ShowSwitchCameraButton: callType === 'video',
       hideAudioModeButton: false,
       ShowAudioModeButton: true,
+      // ── Default States ─────────────────────────────────────────────────────
       startAudioMuted: false,
       StartAudioMuted: false,
       startVideoPaused: false,
@@ -188,11 +328,10 @@ export function ActiveCallModal({
       initialCameraFacing: 'FRONT',
       enableSpotlightSwap: true,
       enableSpotlightDrag: true,
-      hideRecordingButton: true,
-      ShowRecordingButton: false,
       maxParticipantCount: isGroupCall ? 25 : 2,
     };
-  }, [callType, isGroupCall]);
+  }, [callType, isGroupCall, callLayout]);
+
 
   if (!visible) return null;
 
@@ -307,7 +446,7 @@ export function ActiveCallModal({
                   callSettings={sessionSettings}
                 />
 
-                {/* Floating Screen Share & Group Info Overlay on Native Call Screen */}
+                {/* ── Top Bar: Duration/Group Badge on Left, 3 Control Icons on Right in ONE Row ── */}
                 <View
                   pointerEvents="box-none"
                   style={[
@@ -315,35 +454,70 @@ export function ActiveCallModal({
                     { top: topInset + 10 },
                   ]}
                 >
+                  {/* Left: Call Timer or Group Badge */}
                   {isGroupCall ? (
                     <View style={styles.nativeGroupBadge}>
-                      <Users size={12} color="#38bdf8" style={{ marginRight: 4 }} />
-                      <Text style={styles.nativeGroupBadgeText}>
-                        {groupName || 'Group Call'} ({participantCount} in call)
+                      <Users size={13} color="#38bdf8" style={{ marginRight: 5 }} />
+                      <Text style={styles.nativeGroupBadgeText} numberOfLines={1}>
+                        {groupName || 'Group Call'} ({participantCount})
                       </Text>
                     </View>
                   ) : (
-                    <View />
+                    <View style={styles.nativeTimerBadge}>
+                      <View style={styles.timerLiveDot} />
+                      <Text style={styles.nativeTimerText}>{formatDuration(callDuration)}</Text>
+                    </View>
                   )}
 
-                  {/* Floating Direct Screen Share Button */}
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    style={[
-                      styles.nativeScreenShareFloatingBtn,
-                      isScreenSharing && styles.nativeScreenShareFloatingBtnActive,
-                    ]}
-                    onPress={() => setIsScreenSharing(!isScreenSharing)}
-                  >
-                    {isScreenSharing ? (
-                      <ScreenShareOff size={16} color="#ffffff" />
-                    ) : (
-                      <ScreenShare size={16} color="#ffffff" />
-                    )}
-                    <Text style={styles.nativeScreenShareFloatingBtnText}>
-                      {isScreenSharing ? 'Stop Share' : 'Share Screen'}
-                    </Text>
-                  </TouchableOpacity>
+                  {/* Right side: Control Icons in a single, neat horizontal row */}
+                  <View style={styles.nativeActionBtnsRow}>
+                    {/* 1. Camera Switch (front / back) */}
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      style={[
+                        styles.nativeActionIconBtn,
+                        callType === 'audio' && styles.nativeActionIconBtnDisabled,
+                      ]}
+                      onPress={handleSwitchCamera}
+                      disabled={callType === 'audio'}
+                      accessibilityRole="button"
+                      accessibilityLabel="Switch Camera"
+                    >
+                      <SwitchCamera size={18} color={callType === 'audio' ? '#64748b' : '#ffffff'} />
+                    </TouchableOpacity>
+
+                    {/* 2. Layout Switch (Grid / Spotlight) */}
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      style={[
+                        styles.nativeActionIconBtn,
+                        callLayout === 'SPOTLIGHT' && styles.nativeLayoutIconBtnActive,
+                      ]}
+                      onPress={handleToggleLayout}
+                      accessibilityRole="button"
+                      accessibilityLabel="Toggle Layout"
+                    >
+                      <LayoutGrid size={18} color={callLayout === 'SPOTLIGHT' ? '#38bdf8' : '#ffffff'} />
+                    </TouchableOpacity>
+
+                    {/* 3. Screen Share (CometChat screen sharing) */}
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      style={[
+                        styles.nativeActionIconBtn,
+                        isScreenSharing && styles.nativeScreenShareIconBtnActive,
+                      ]}
+                      onPress={toggleScreenShare}
+                      accessibilityRole="button"
+                      accessibilityLabel={isScreenSharing ? 'Stop Screen Share' : 'Start Screen Share'}
+                    >
+                      {isScreenSharing ? (
+                        <ScreenShareOff size={18} color="#ffffff" />
+                      ) : (
+                        <ScreenShare size={18} color="#ffffff" />
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 {/* Screen Share Active Banner */}
@@ -351,15 +525,15 @@ export function ActiveCallModal({
                   <View
                     pointerEvents="box-none"
                     style={[
-                      styles.nativeScreenShareBanner,
-                      { top: topInset + 52 },
+                      styles.nativeIndicatorBanner,
+                      { top: topInset + 58 },
                     ]}
                   >
                     <View style={styles.screenShareBannerInner}>
                       <MonitorUp size={14} color="#10b981" style={{ marginRight: 6 }} />
                       <Text style={styles.screenShareText}>Sharing Screen</Text>
                       <TouchableOpacity
-                        onPress={() => setIsScreenSharing(false)}
+                        onPress={stopScreenShare}
                         style={styles.stopShareBtn}
                       >
                         <Text style={styles.stopShareText}>Stop</Text>
@@ -402,7 +576,7 @@ export function ActiveCallModal({
                     <MonitorUp size={16} color="#10b981" style={{ marginRight: 8 }} />
                     <Text style={styles.screenShareText}>You are sharing your screen</Text>
                     <TouchableOpacity
-                      onPress={() => setIsScreenSharing(false)}
+                      onPress={stopScreenShare}
                       style={styles.stopShareBtn}
                     >
                       <Text style={styles.stopShareText}>Stop</Text>
@@ -493,7 +667,9 @@ export function ActiveCallModal({
                   {/* Screen Share Toggle */}
                   <TouchableOpacity
                     style={[styles.controlBtn, isScreenSharing && styles.screenShareBtnActive]}
-                    onPress={() => setIsScreenSharing(!isScreenSharing)}
+                    onPress={toggleScreenShare}
+                    accessibilityRole="button"
+                    accessibilityLabel={isScreenSharing ? 'Stop Screen Share' : 'Start Screen Share'}
                   >
                     {isScreenSharing ? (
                       <ScreenShareOff size={22} color="#10b981" />
@@ -505,7 +681,7 @@ export function ActiveCallModal({
                   {/* Hangup / End Call */}
                   <TouchableOpacity
                     style={[styles.controlBtn, styles.hangupBtnSmall]}
-                    onPress={onEndCall}
+                    onPress={handleEndCall}
                   >
                     <PhoneOff size={26} color="#ffffff" />
                   </TouchableOpacity>
@@ -811,54 +987,94 @@ const styles = StyleSheet.create({
   },
   nativeTopOverlay: {
     position: 'absolute',
-    left: 16,
-    right: 16,
+    left: 14,
+    right: 14,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     zIndex: 999,
   },
+  nativeTimerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.88)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  timerLiveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#22c55e',
+    marginRight: 6,
+  },
+  nativeTimerText: {
+    color: '#f8fafc',
+    fontSize: 12,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  nativeActionBtnsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   nativeGroupBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
+    backgroundColor: 'rgba(15, 23, 42, 0.88)',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.3)',
+    borderColor: 'rgba(56, 189, 248, 0.35)',
+    maxWidth: SCREEN_WIDTH - 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   nativeGroupBadgeText: {
     fontSize: 12,
     fontWeight: '600',
     color: '#38bdf8',
   },
-  nativeScreenShareFloatingBtn: {
-    flexDirection: 'row',
+  nativeActionIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(15, 23, 42, 0.88)',
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-    gap: 6,
+    borderColor: 'rgba(255, 255, 255, 0.22)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    elevation: 6,
   },
-  nativeScreenShareFloatingBtnActive: {
-    backgroundColor: 'rgba(16, 185, 129, 0.9)',
-    borderColor: '#10b981',
+  nativeActionIconBtnDisabled: {
+    opacity: 0.35,
   },
-  nativeScreenShareFloatingBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
+  nativeScreenShareIconBtnActive: {
+    backgroundColor: '#10b981',
+    borderColor: '#34d399',
   },
-  nativeScreenShareBanner: {
+  nativeLayoutIconBtnActive: {
+    backgroundColor: 'rgba(56, 189, 248, 0.25)',
+    borderColor: '#38bdf8',
+  },
+  nativeIndicatorBanner: {
     position: 'absolute',
     left: 0,
     right: 0,
@@ -868,7 +1084,7 @@ const styles = StyleSheet.create({
   screenShareBannerInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+    backgroundColor: 'rgba(15, 23, 42, 0.92)',
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.5)',
     paddingHorizontal: 14,
