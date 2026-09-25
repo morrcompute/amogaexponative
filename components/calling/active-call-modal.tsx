@@ -283,7 +283,9 @@ export function ActiveCallModal({
   const [callDuration, setCallDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoDisabled, setIsVideoDisabled] = useState(callType === 'audio');
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [isLocalScreenSharing, setIsLocalScreenSharing] = useState(false);
+  const [remoteScreenSharingUser, setRemoteScreenSharingUser] = useState<{ id?: string; name?: string } | null>(null);
+  const isScreenSharing = isLocalScreenSharing || Boolean(remoteScreenSharingUser);
   const [isCameraFront, setIsCameraFront] = useState(true); // track which camera is active
   const [callLayout, setCallLayout] = useState<'TILE' | 'SPOTLIGHT'>('TILE');
 
@@ -490,7 +492,7 @@ export function ActiveCallModal({
     } catch (err) {
       console.warn('[ScreenShare] Error stopping stream tracks:', err);
     }
-    setIsScreenSharing(false);
+    setIsLocalScreenSharing(false);
   }, []);
 
   // Wrapper for ending call cleanly
@@ -509,6 +511,63 @@ export function ActiveCallModal({
 
   // Memoize sessionSettings — configured for Desktop Web & Mobile APK
   const sessionSettings = useMemo(() => {
+    const sdk = cometchatService.getSDK();
+
+    // Native React Native: Must construct a valid CallSettings instance using CallSettingsBuilder!
+    if (Platform.OS !== 'web' && sdk?.CallSettingsBuilder) {
+      try {
+        const builder = new sdk.CallSettingsBuilder();
+        builder
+          .enableDefaultLayout(true)
+          .setIsAudioOnlyCall(callType === 'audio')
+          .showEndCallButton(true)
+          .showSwitchCameraButton(false) // Custom top bar handles camera flip
+          .showMuteAudioButton(true)
+          .showPauseVideoButton(callType === 'video')
+          .showAudioModeButton(true)
+          .startWithAudioMuted(false)
+          .startWithVideoMuted(false)
+          .showRecordingButton(false);
+
+        if (callLayout === 'TILE') {
+          builder.setMode('SIDEBAR');
+        } else {
+          builder.setMode('SPOTLIGHT');
+        }
+
+        if (sdk.OngoingCallListener) {
+          const listener = new sdk.OngoingCallListener({
+            onCallEndButtonPressed: () => {
+              console.log('[NativeCall] onCallEndButtonPressed fired');
+              handleEndCall();
+            },
+            onCallEnded: () => {
+              console.log('[NativeCall] onCallEnded fired');
+              handleEndCall();
+            },
+            onUserLeft: (u: any) => {
+              console.log('[NativeCall] onUserLeft fired:', u);
+              if (!isGroupCall) {
+                handleEndCall();
+              }
+            },
+            onSessionTimeout: () => {
+              console.log('[NativeCall] onSessionTimeout fired');
+              handleEndCall();
+            },
+            onError: (e: any) => {
+              console.warn('[NativeCall] Call error:', e);
+            },
+          });
+          builder.setCallEventListener(listener);
+        }
+
+        return builder.build();
+      } catch (e) {
+        console.warn('[NativeCall] Error creating CallSettings via CallSettingsBuilder:', e);
+      }
+    }
+
     return {
       sessionType: callType === 'audio' ? 'VOICE' : 'VIDEO',
       isAudioOnly: callType === 'audio',
@@ -596,11 +655,12 @@ export function ActiveCallModal({
         },
         onScreenShareStarted: () => {
           console.log('[WebCall] onScreenShareStarted fired');
-          setIsScreenSharing(true);
+          setIsLocalScreenSharing(true);
+          setRemoteScreenSharingUser(null);
         },
         onScreenShareStopped: () => {
           console.log('[WebCall] onScreenShareStopped fired');
-          setIsScreenSharing(false);
+          setIsLocalScreenSharing(false);
         },
       }),
     };
@@ -637,7 +697,8 @@ export function ActiveCallModal({
       if (cometchatService.isSupported()) {
         console.log('[ScreenShare] Starting CometChat screen sharing via Calls SDK...');
         cometchatService.startScreenSharing();
-        setIsScreenSharing(true);
+        setIsLocalScreenSharing(true);
+        setRemoteScreenSharingUser(null);
         return;
       }
 
@@ -652,7 +713,8 @@ export function ActiveCallModal({
           });
           if (stream) {
             screenStreamRef.current = stream;
-            setIsScreenSharing(true);
+            setIsLocalScreenSharing(true);
+            setRemoteScreenSharingUser(null);
 
             // Listen for track ending (e.g. user clicks "Stop sharing" in browser banner)
             const videoTracks = stream.getVideoTracks ? stream.getVideoTracks() : [];
@@ -677,7 +739,7 @@ export function ActiveCallModal({
       );
     } catch (error: any) {
       console.warn('[ScreenShare] Error starting screen share:', error);
-      setIsScreenSharing(false);
+      setIsLocalScreenSharing(false);
       const errorMsg = error?.message || String(error || '');
       if (
         !errorMsg.toLowerCase().includes('cancel') &&
@@ -763,12 +825,12 @@ export function ActiveCallModal({
 
 
   const toggleScreenShare = useCallback(() => {
-    if (isScreenSharing) {
+    if (isLocalScreenSharing) {
       stopScreenShare();
     } else {
       startScreenShare();
     }
-  }, [isScreenSharing, startScreenShare, stopScreenShare]);
+  }, [isLocalScreenSharing, startScreenShare, stopScreenShare]);
 
   // CometChat camera flip
   const handleSwitchCamera = useCallback(() => {
@@ -965,19 +1027,21 @@ export function ActiveCallModal({
 
     // ── Screen share events ───────────────────────────────────────────────────
     cometchatService.addEventListener('onScreenShareStarted', () => {
-      setIsScreenSharing(true);
+      setIsLocalScreenSharing(true);
+      setRemoteScreenSharingUser(null);
     }, { signal });
 
     cometchatService.addEventListener('onScreenShareStopped', () => {
-      setIsScreenSharing(false);
+      setIsLocalScreenSharing(false);
     }, { signal });
 
-    cometchatService.addEventListener('onParticipantStartedScreenShare', () => {
-      setIsScreenSharing(true);
+    cometchatService.addEventListener('onParticipantStartedScreenShare', (user: any) => {
+      setIsLocalScreenSharing(false);
+      setRemoteScreenSharingUser(user || { name: partnerName || 'Participant' });
     }, { signal });
 
     cometchatService.addEventListener('onParticipantStoppedScreenShare', () => {
-      setIsScreenSharing(false);
+      setRemoteScreenSharingUser(null);
     }, { signal });
 
     return () => {
@@ -1183,13 +1247,13 @@ export function ActiveCallModal({
                         activeOpacity={0.8}
                         style={[
                           styles.nativeActionIconBtn,
-                          isScreenSharing && styles.nativeScreenShareIconBtnActive,
+                          isLocalScreenSharing && styles.nativeScreenShareIconBtnActive,
                         ]}
                         onPress={toggleScreenShare}
                         accessibilityRole="button"
-                        accessibilityLabel={isScreenSharing ? 'Stop Screen Share' : 'Start Screen Share'}
+                        accessibilityLabel={isLocalScreenSharing ? 'Stop Screen Share' : 'Start Screen Share'}
                       >
-                        {isScreenSharing ? (
+                        {isLocalScreenSharing ? (
                           <ScreenShareOff size={18} color="#ffffff" />
                         ) : (
                           <ScreenShare size={18} color="#ffffff" />
@@ -1285,15 +1349,30 @@ export function ActiveCallModal({
                       { top: topInset + 58 },
                     ]}
                   >
-                    <View style={styles.screenShareBannerInner}>
-                      <MonitorUp size={14} color="#10b981" style={{ marginRight: 6 }} />
-                      <Text style={styles.screenShareText}>Sharing Screen</Text>
-                      <TouchableOpacity
-                        onPress={stopScreenShare}
-                        style={styles.stopShareBtn}
-                      >
-                        <Text style={styles.stopShareText}>Stop</Text>
-                      </TouchableOpacity>
+                    <View
+                      style={[
+                        styles.screenShareBannerInner,
+                        !isLocalScreenSharing && { borderColor: 'rgba(56, 189, 248, 0.4)' },
+                      ]}
+                    >
+                      <MonitorUp
+                        size={14}
+                        color={isLocalScreenSharing ? '#10b981' : '#38bdf8'}
+                        style={{ marginRight: 6 }}
+                      />
+                      <Text style={styles.screenShareText}>
+                        {isLocalScreenSharing
+                          ? 'You are sharing your screen'
+                          : `${remoteScreenSharingUser?.name || 'Participant'} is sharing screen`}
+                      </Text>
+                      {isLocalScreenSharing && (
+                        <TouchableOpacity
+                          onPress={stopScreenShare}
+                          style={styles.stopShareBtn}
+                        >
+                          <Text style={styles.stopShareText}>Stop</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
                 )}
@@ -1362,13 +1441,13 @@ export function ActiveCallModal({
                           activeOpacity={0.8}
                           style={[
                             styles.nativeActionIconBtn,
-                            isScreenSharing && styles.nativeScreenShareIconBtnActive,
+                            isLocalScreenSharing && styles.nativeScreenShareIconBtnActive,
                           ]}
                           onPress={toggleScreenShare}
                           accessibilityRole="button"
-                          accessibilityLabel={isScreenSharing ? 'Stop Screen Share' : 'Start Screen Share'}
+                          accessibilityLabel={isLocalScreenSharing ? 'Stop Screen Share' : 'Start Screen Share'}
                         >
-                          {isScreenSharing ? (
+                          {isLocalScreenSharing ? (
                             <ScreenShareOff size={18} color="#ffffff" />
                           ) : (
                             <ScreenShare size={18} color="#ffffff" />
@@ -1408,15 +1487,25 @@ export function ActiveCallModal({
 
                 {/* Screen Share Active Banner */}
                 {isScreenSharing && (
-                  <View style={styles.screenShareBanner}>
-                    <MonitorUp size={16} color="#10b981" style={{ marginRight: 8 }} />
-                    <Text style={styles.screenShareText}>You are sharing your screen</Text>
-                    <TouchableOpacity
-                      onPress={stopScreenShare}
-                      style={styles.stopShareBtn}
-                    >
-                      <Text style={styles.stopShareText}>Stop</Text>
-                    </TouchableOpacity>
+                  <View style={[styles.screenShareBanner, !isLocalScreenSharing && { borderColor: 'rgba(56, 189, 248, 0.4)' }]}>
+                    <MonitorUp
+                      size={16}
+                      color={isLocalScreenSharing ? '#10b981' : '#38bdf8'}
+                      style={{ marginRight: 8 }}
+                    />
+                    <Text style={styles.screenShareText}>
+                      {isLocalScreenSharing
+                        ? 'You are sharing your screen'
+                        : `${remoteScreenSharingUser?.name || 'Participant'} is sharing screen`}
+                    </Text>
+                    {isLocalScreenSharing && (
+                      <TouchableOpacity
+                        onPress={stopScreenShare}
+                        style={styles.stopShareBtn}
+                      >
+                        <Text style={styles.stopShareText}>Stop</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
 
@@ -1558,12 +1647,12 @@ export function ActiveCallModal({
 
                   {/* Screen Share Toggle */}
                   <TouchableOpacity
-                    style={[styles.controlBtn, isScreenSharing && styles.screenShareBtnActive]}
+                    style={[styles.controlBtn, isLocalScreenSharing && styles.screenShareBtnActive]}
                     onPress={toggleScreenShare}
                     accessibilityRole="button"
-                    accessibilityLabel={isScreenSharing ? 'Stop Screen Share' : 'Start Screen Share'}
+                    accessibilityLabel={isLocalScreenSharing ? 'Stop Screen Share' : 'Start Screen Share'}
                   >
-                    {isScreenSharing ? (
+                    {isLocalScreenSharing ? (
                       <ScreenShareOff size={22} color="#10b981" />
                     ) : (
                       <ScreenShare size={22} color="#ffffff" />
