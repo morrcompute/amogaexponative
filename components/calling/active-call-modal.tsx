@@ -12,6 +12,8 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -28,8 +30,12 @@ import {
   SwitchCamera,
   FlipHorizontal2,
   LayoutGrid,
+  MessageSquare,
+  Send,
+  X,
 } from 'lucide-react-native';
 import { cometchatService } from '../../lib/cometchat-service';
+import { supabase } from '../../lib/supabase';
 
 export interface CallParticipant {
   id: string;
@@ -55,6 +61,7 @@ export interface ActiveCallModalProps {
   participants?: CallParticipant[];
   currentUserId?: string;
   currentUserMobile?: string;
+  currentUserName?: string;
   conversationId?: string;
 }
 
@@ -88,6 +95,167 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
   }
 }
 
+interface InCallMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  time: string;
+  isSelf: boolean;
+}
+
+interface InCallChatSidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+  isMobile: boolean;
+  inCallMessages: InCallMessage[];
+  chatInputText: string;
+  setChatInputText: (text: string) => void;
+  onSendMessage: () => void;
+  chatScrollRef: React.RefObject<ScrollView | null>;
+  topInset: number;
+  bottomInset: number;
+}
+
+function InCallChatSidebar({
+  isOpen,
+  onClose,
+  isMobile,
+  inCallMessages,
+  chatInputText,
+  setChatInputText,
+  onSendMessage,
+  chatScrollRef,
+  topInset,
+  bottomInset,
+}: InCallChatSidebarProps) {
+  if (!isOpen) return null;
+
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={[
+        isMobile ? styles.mobileChatOverlay : styles.desktopChatSidebar,
+        isMobile && { paddingTop: topInset + 8, paddingBottom: bottomInset + 8 },
+      ]}
+    >
+      {/* Top Header Bar */}
+      <View style={styles.chatSidebarHeader}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={styles.chatHeaderIconBadge}>
+            <MessageSquare size={16} color="#38bdf8" />
+          </View>
+          <Text style={styles.chatSidebarTitle}>In-call messages</Text>
+        </View>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={onClose}
+          style={styles.chatCloseBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Close chat"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <X size={18} color="#94a3b8" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Info Notice (Google Meet / Zoom style) */}
+      <View style={styles.chatNoticeBanner}>
+        <Text style={styles.chatNoticeText}>
+          Messages can be seen only by people in the call.
+        </Text>
+      </View>
+
+      {/* Message List */}
+      <ScrollView
+        ref={chatScrollRef}
+        style={styles.chatMessageScroll}
+        contentContainerStyle={[
+          styles.chatMessageContent,
+          inCallMessages.length === 0 && { justifyContent: 'center', alignItems: 'center' },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        {inCallMessages.length === 0 ? (
+          <View style={styles.chatEmptyState}>
+            <View style={styles.chatEmptyIconCircle}>
+              <MessageSquare size={28} color="#475569" />
+            </View>
+            <Text style={styles.chatEmptyTitle}>No messages yet</Text>
+            <Text style={styles.chatEmptySub}>
+              Send a message to everyone in the call.
+            </Text>
+          </View>
+        ) : (
+          inCallMessages.map((msg) => (
+            <View
+              key={msg.id}
+              style={[
+                styles.chatMsgItem,
+                msg.isSelf ? styles.chatMsgItemSelf : styles.chatMsgItemOther,
+              ]}
+            >
+              <View style={styles.chatMsgHeader}>
+                <Text
+                  style={[
+                    styles.chatMsgSender,
+                    { color: msg.isSelf ? '#34d399' : '#38bdf8' },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {msg.senderName}
+                </Text>
+                <Text style={styles.chatMsgTime}>{msg.time}</Text>
+              </View>
+              <View
+                style={[
+                  styles.chatBubble,
+                  msg.isSelf ? styles.chatBubbleSelf : styles.chatBubbleOther,
+                ]}
+              >
+                <Text style={styles.chatBubbleText}>{msg.text}</Text>
+              </View>
+            </View>
+          ))
+        )}
+      </ScrollView>
+
+      {/* Bottom Message Input Bar */}
+      <View style={styles.chatInputRow}>
+        <TextInput
+          style={styles.chatTextInput}
+          placeholder="Send a message to everyone..."
+          placeholderTextColor="#64748b"
+          value={chatInputText}
+          onChangeText={setChatInputText}
+          returnKeyType="send"
+          onSubmitEditing={onSendMessage}
+          onKeyPress={(e: any) => {
+            if (Platform.OS === 'web' && e.nativeEvent?.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault?.();
+              onSendMessage();
+            }
+          }}
+          multiline={false}
+        />
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={onSendMessage}
+          disabled={!chatInputText.trim()}
+          style={[
+            styles.chatSendBtn,
+            chatInputText.trim() ? styles.chatSendBtnActive : styles.chatSendBtnDisabled,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Send message"
+        >
+          <Send size={15} color="#ffffff" />
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
 export function ActiveCallModal({
   visible,
   callState,
@@ -103,6 +271,7 @@ export function ActiveCallModal({
   participants = [],
   currentUserId,
   currentUserMobile,
+  currentUserName,
   conversationId,
 }: ActiveCallModalProps) {
   const insets = useSafeAreaInsets();
@@ -118,11 +287,118 @@ export function ActiveCallModal({
   const [isCameraFront, setIsCameraFront] = useState(true); // track which camera is active
   const [callLayout, setCallLayout] = useState<'TILE' | 'SPOTLIGHT'>('TILE');
 
+  // In-Call Chat State (Google Meet / Zoom style sidechat)
+  const [isSideChatOpen, setIsSideChatOpen] = useState(false);
+  const [inCallMessages, setInCallMessages] = useState<
+    Array<{ id: string; senderId: string; senderName: string; text: string; time: string; isSelf: boolean }>
+  >([]);
+  const [chatInputText, setChatInputText] = useState('');
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const chatScrollRef = useRef<ScrollView | null>(null);
+
   const screenStreamRef = useRef<any>(null);
   const localWebStreamRef = useRef<any>(null);
   const webVideoRef = useRef<any>(null);
   const webScreenVideoRef = useRef<any>(null);
   const webCallContainerRef = useRef<any>(null);
+
+  // Listen for in-call chat broadcast messages via Supabase
+  useEffect(() => {
+    if (!visible || callState !== 'active' || !sessionId) return;
+
+    const channel = supabase.channel(`call_chat_${sessionId}`);
+    channel
+      .on('broadcast', { event: 'new_message' }, ({ payload }: any) => {
+        if (!payload || !payload.text) return;
+        const isFromSelf = payload.senderId === currentUserId;
+        const newMsg = {
+          id: payload.id || `msg_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          senderId: payload.senderId || 'participant',
+          senderName: payload.senderName || 'Participant',
+          text: payload.text,
+          time: payload.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isSelf: isFromSelf,
+        };
+        setInCallMessages((prev) => {
+          if (prev.some((m) => m.id === newMsg.id)) return prev;
+          return [...prev, newMsg];
+        });
+        if (!isFromSelf && !isSideChatOpen) {
+          setUnreadChatCount((prev) => prev + 1);
+        }
+        setTimeout(() => {
+          chatScrollRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [visible, callState, sessionId, currentUserId, isSideChatOpen]);
+
+  // Send an in-call message
+  const handleSendInCallMessage = useCallback(async () => {
+    const trimmed = chatInputText.trim();
+    if (!trimmed || !sessionId) return;
+
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const msgId = `incall_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const myName = currentUserName || 'You';
+
+    const localMsg = {
+      id: msgId,
+      senderId: currentUserId || 'me',
+      senderName: myName,
+      text: trimmed,
+      time: timeStr,
+      isSelf: true,
+    };
+
+    setInCallMessages((prev) => [...prev, localMsg]);
+    setChatInputText('');
+
+    setTimeout(() => {
+      chatScrollRef.current?.scrollToEnd({ animated: true });
+    }, 80);
+
+    try {
+      const channel = supabase.channel(`call_chat_${sessionId}`);
+      channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          channel.send({
+            type: 'broadcast',
+            event: 'new_message',
+            payload: {
+              id: msgId,
+              senderId: currentUserId || 'me',
+              senderName: myName,
+              text: trimmed,
+              time: timeStr,
+            },
+          });
+        }
+      });
+    } catch (e) {
+      console.warn('[InCallChat] Error broadcasting message:', e);
+    }
+
+    // Persist into chat_messages if conversationId is provided
+    if (conversationId && currentUserId) {
+      try {
+        await supabase.from('chat_messages').insert({
+          conversation_id: conversationId,
+          owner_user_id: currentUserId,
+          sender_user_id: currentUserId,
+          message: trimmed,
+          message_type: 'text',
+          direction: 'Sent',
+          sent: true,
+          received: false,
+        });
+      } catch (_) {}
+    }
+  }, [chatInputText, sessionId, currentUserId, currentUserName, conversationId]);
 
   // Stop web media stream and release tracks
   const stopWebMedia = useCallback(() => {
@@ -166,6 +442,9 @@ export function ActiveCallModal({
   // Wrapper for ending call cleanly
   const handleEndCall = useCallback(async () => {
     console.log('[ActiveCallModal] handleEndCall initiated');
+    setIsSideChatOpen(false);
+    setInCallMessages([]);
+    setUnreadChatCount(0);
     stopScreenShare();
     stopWebMedia();
     cometchatService.leaveSession();
@@ -732,7 +1011,7 @@ export function ActiveCallModal({
           </View>
         ) : (
           /* ───────────── ACTIVE CALL STATE ───────────── */
-          <View style={styles.activeContainer}>
+          <View style={[styles.activeContainer, isDesktopWeb && { flexDirection: 'row' }]}>
             {callToken && ((Platform.OS !== 'web' && CometChatComponent) || Platform.OS === 'web') ? (
               /* CometChat WebRTC Calling Component (Native & Web) with Safe Area Insets & Custom Controls Overlay */
               <View
@@ -769,7 +1048,7 @@ export function ActiveCallModal({
                 )}
 
 
-                {/* ── Top Bar: Duration/Group Badge on Left, 3 Control Icons on Right for Mobile ── */}
+                {/* ── Top Bar: Duration/Group Badge on Left, Control Icons on Right for Mobile ── */}
                 <View
                   pointerEvents="box-none"
                   style={[
@@ -793,7 +1072,7 @@ export function ActiveCallModal({
                     </View>
                   )}
 
-                  {/* Mobile Only: 3 Control Icons in a single, neat horizontal row */}
+                  {/* Mobile Only: Control Icons in a single, neat horizontal row */}
                   {isMobile && (
                     <View style={styles.nativeActionBtnsRow}>
                       {/* 1. Camera Switch (front / back) */}
@@ -842,11 +1121,34 @@ export function ActiveCallModal({
                           <ScreenShare size={18} color="#ffffff" />
                         )}
                       </TouchableOpacity>
+
+                      {/* 4. In-Call Chat */}
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        style={[
+                          styles.nativeActionIconBtn,
+                          isSideChatOpen && styles.nativeLayoutIconBtnActive,
+                          { position: 'relative' },
+                        ]}
+                        onPress={() => {
+                          setIsSideChatOpen((prev) => {
+                            if (!prev) setUnreadChatCount(0);
+                            return !prev;
+                          });
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel="In-Call Chat"
+                      >
+                        <MessageSquare size={18} color={isSideChatOpen ? '#38bdf8' : '#ffffff'} />
+                        {unreadChatCount > 0 && !isSideChatOpen && (
+                          <View style={styles.mobileChatDot} />
+                        )}
+                      </TouchableOpacity>
                     </View>
                   )}
                 </View>
 
-                {/* Desktop Web: Clean Layout Mode Button on Bottom */}
+                {/* Desktop Web: Clean Layout Mode & Chat Buttons on Bottom */}
                 {isDesktopWeb && (
                   <View style={styles.desktopBottomLayoutContainer} pointerEvents="box-none">
                     <TouchableOpacity
@@ -854,6 +1156,7 @@ export function ActiveCallModal({
                       style={[
                         styles.desktopLayoutDockBtn,
                         callLayout === 'SPOTLIGHT' && styles.desktopLayoutDockBtnActive,
+                        { marginRight: 10 },
                       ]}
                       onPress={handleToggleLayout}
                       accessibilityRole="button"
@@ -863,6 +1166,34 @@ export function ActiveCallModal({
                       <Text style={[styles.desktopLayoutDockText, callLayout === 'SPOTLIGHT' && styles.desktopLayoutDockTextActive]}>
                         {callLayout === 'SPOTLIGHT' ? 'Spotlight' : 'Grid'}
                       </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      style={[
+                        styles.desktopLayoutDockBtn,
+                        isSideChatOpen && styles.desktopLayoutDockBtnActive,
+                      ]}
+                      onPress={() => {
+                        setIsSideChatOpen((prev) => {
+                          if (!prev) setUnreadChatCount(0);
+                          return !prev;
+                        });
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Toggle In-Call Chat"
+                    >
+                      <MessageSquare size={16} color={isSideChatOpen ? '#38bdf8' : '#ffffff'} style={{ marginRight: 6 }} />
+                      <Text style={[styles.desktopLayoutDockText, isSideChatOpen && styles.desktopLayoutDockTextActive]}>
+                        In-call chat
+                      </Text>
+                      {unreadChatCount > 0 && !isSideChatOpen && (
+                        <View style={styles.chatBadge}>
+                          <Text style={styles.chatBadgeText}>
+                            {unreadChatCount > 9 ? '9+' : unreadChatCount}
+                          </Text>
+                        </View>
+                      )}
                     </TouchableOpacity>
                   </View>
                 )}
@@ -919,7 +1250,7 @@ export function ActiveCallModal({
                       <Text style={styles.timerText}>{formatDuration(callDuration)}</Text>
                     </View>
 
-                    {/* Mobile 3-icon row in fallback view */}
+                    {/* Mobile 4-icon row in fallback view */}
                     {isMobile && (
                       <View style={styles.nativeActionBtnsRow}>
                         <TouchableOpacity
@@ -963,6 +1294,29 @@ export function ActiveCallModal({
                             <ScreenShareOff size={18} color="#ffffff" />
                           ) : (
                             <ScreenShare size={18} color="#ffffff" />
+                          )}
+                        </TouchableOpacity>
+
+                        {/* In-Call Chat */}
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          style={[
+                            styles.nativeActionIconBtn,
+                            isSideChatOpen && styles.nativeLayoutIconBtnActive,
+                            { position: 'relative' },
+                          ]}
+                          onPress={() => {
+                            setIsSideChatOpen((prev) => {
+                              if (!prev) setUnreadChatCount(0);
+                              return !prev;
+                            });
+                          }}
+                          accessibilityRole="button"
+                          accessibilityLabel="In-Call Chat"
+                        >
+                          <MessageSquare size={18} color={isSideChatOpen ? '#38bdf8' : '#ffffff'} />
+                          {unreadChatCount > 0 && !isSideChatOpen && (
+                            <View style={styles.mobileChatDot} />
                           )}
                         </TouchableOpacity>
                       </View>
@@ -1134,6 +1488,24 @@ export function ActiveCallModal({
                     )}
                   </TouchableOpacity>
 
+                  {/* In-Call Chat Toggle Button */}
+                  <TouchableOpacity
+                    style={[styles.controlBtn, isSideChatOpen && styles.controlBtnActive, { position: 'relative' }]}
+                    onPress={() => {
+                      setIsSideChatOpen((prev) => {
+                        if (!prev) setUnreadChatCount(0);
+                        return !prev;
+                      });
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Toggle Chat"
+                  >
+                    <MessageSquare size={22} color={isSideChatOpen ? '#38bdf8' : '#ffffff'} />
+                    {unreadChatCount > 0 && !isSideChatOpen && (
+                      <View style={styles.mobileChatDot} />
+                    )}
+                  </TouchableOpacity>
+
                   {/* Hangup / End Call */}
                   <TouchableOpacity
                     style={[styles.controlBtn, styles.hangupBtnSmall]}
@@ -1144,6 +1516,20 @@ export function ActiveCallModal({
                 </View>
               </View>
             )}
+
+            {/* In-Call Chat Sidebar (Desktop Side Dock / Mobile Fullscreen Overlay) */}
+            <InCallChatSidebar
+              isOpen={isSideChatOpen}
+              onClose={() => setIsSideChatOpen(false)}
+              inCallMessages={inCallMessages}
+              chatInputText={chatInputText}
+              setChatInputText={setChatInputText}
+              onSendMessage={handleSendInCallMessage}
+              chatScrollRef={chatScrollRef}
+              isMobile={isMobile}
+              topInset={topInset}
+              bottomInset={bottomInset}
+            />
           </View>
         )}
       </View>
@@ -1243,18 +1629,21 @@ const styles = StyleSheet.create({
   },
   nativeCallWrapper: {
     flex: 1,
-    width: '100%',
+    minWidth: 0,
     height: '100%',
     backgroundColor: '#000000',
+    position: 'relative',
+    overflow: 'hidden',
   },
   fallbackContainer: {
     flex: 1,
-    width: '100%',
+    minWidth: 0,
     height: '100%',
     backgroundColor: '#090d16',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     alignItems: 'center',
+    position: 'relative',
   },
   headerInfo: {
     alignItems: 'center',
@@ -1578,6 +1967,8 @@ const styles = StyleSheet.create({
     bottom: 24,
     right: 28,
     zIndex: 9999,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   desktopLayoutDockBtn: {
     flexDirection: 'row',
@@ -1605,5 +1996,205 @@ const styles = StyleSheet.create({
   },
   desktopLayoutDockTextActive: {
     color: '#38bdf8',
+  },
+
+  /* ── In-Call Chat Sidebar Styles (Google Meet / Zoom style) ── */
+  desktopChatSidebar: {
+    width: 360,
+    height: '100%',
+    backgroundColor: '#0b0f19',
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(255, 255, 255, 0.1)',
+    zIndex: 10000,
+    flexDirection: 'column',
+  },
+  mobileChatOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#090d16',
+    zIndex: 99999,
+    flexDirection: 'column',
+  },
+  chatSidebarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  chatHeaderIconBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatSidebarTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ffffff',
+    letterSpacing: -0.2,
+  },
+  chatCloseBtn: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  chatNoticeBanner: {
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  chatNoticeText: {
+    fontSize: 12,
+    color: '#94a3b8',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  chatMessageScroll: {
+    flex: 1,
+    paddingHorizontal: 14,
+  },
+  chatMessageContent: {
+    paddingVertical: 12,
+    minHeight: '100%',
+  },
+  chatEmptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  chatEmptyIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(30, 41, 59, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  chatEmptyTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#cbd5e1',
+    marginBottom: 4,
+  },
+  chatEmptySub: {
+    fontSize: 12,
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  chatMsgItem: {
+    marginBottom: 12,
+    maxWidth: '85%',
+  },
+  chatMsgItemSelf: {
+    alignSelf: 'flex-end',
+  },
+  chatMsgItemOther: {
+    alignSelf: 'flex-start',
+  },
+  chatMsgHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 3,
+    paddingHorizontal: 2,
+  },
+  chatMsgSender: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  chatMsgTime: {
+    fontSize: 10,
+    color: '#64748b',
+  },
+  chatBubble: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+  },
+  chatBubbleSelf: {
+    backgroundColor: '#0284c7',
+    borderBottomRightRadius: 2,
+  },
+  chatBubbleOther: {
+    backgroundColor: '#1e293b',
+    borderBottomLeftRadius: 2,
+  },
+  chatBubbleText: {
+    fontSize: 13,
+    color: '#ffffff',
+    lineHeight: 18,
+  },
+  chatInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#0f172a',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    gap: 8,
+  },
+  chatTextInput: {
+    flex: 1,
+    height: 40,
+    backgroundColor: '#1e293b',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    color: '#ffffff',
+    fontSize: 13,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  chatSendBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatSendBtnActive: {
+    backgroundColor: '#0284c7',
+  },
+  chatSendBtnDisabled: {
+    backgroundColor: '#334155',
+    opacity: 0.5,
+  },
+  chatBadge: {
+    marginLeft: 6,
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    minWidth: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  mobileChatDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ef4444',
+    borderWidth: 1.5,
+    borderColor: '#090d16',
   },
 });

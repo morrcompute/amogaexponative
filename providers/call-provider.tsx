@@ -628,7 +628,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         participantCount={groupInfo?.memberCount}
         currentUserId={user?.id}
         currentUserMobile={currentUserMobile}
-        conversationId={isGroupCall ? groupInfo?.id : undefined}
+        currentUserName={displayName}
+        conversationId={isGroupCall ? groupInfo?.id : partnerInfo?.id}
         onEndCall={endCall}
       />
     </CallContext.Provider>
