@@ -247,7 +247,7 @@ function InCallChatSidebar({
             chatInputText.trim() ? styles.chatSendBtnActive : styles.chatSendBtnDisabled,
           ]}
           accessibilityRole="button"
-          accessibilityLabel="Send message"
+          accessibilityLabel="Submit message"
         >
           <Send size={15} color="#ffffff" />
         </TouchableOpacity>
@@ -302,6 +302,11 @@ export function ActiveCallModal({
   const webScreenVideoRef = useRef<any>(null);
   const webCallContainerRef = useRef<any>(null);
 
+  const isSideChatOpenRef = useRef(isSideChatOpen);
+  useEffect(() => {
+    isSideChatOpenRef.current = isSideChatOpen;
+  }, [isSideChatOpen]);
+
   // Listen for in-call chat broadcast messages via Supabase
   useEffect(() => {
     if (!visible || callState !== 'active' || !sessionId) return;
@@ -323,7 +328,7 @@ export function ActiveCallModal({
           if (prev.some((m) => m.id === newMsg.id)) return prev;
           return [...prev, newMsg];
         });
-        if (!isFromSelf && !isSideChatOpen) {
+        if (!isFromSelf && !isSideChatOpenRef.current) {
           setUnreadChatCount((prev) => prev + 1);
         }
         setTimeout(() => {
@@ -335,7 +340,7 @@ export function ActiveCallModal({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [visible, callState, sessionId, currentUserId, isSideChatOpen]);
+  }, [visible, callState, sessionId, currentUserId]);
 
   // Send an in-call message
   const handleSendInCallMessage = useCallback(async () => {
@@ -633,6 +638,11 @@ export function ActiveCallModal({
     }
   }, [stopScreenShare]);
 
+  const sessionSettingsRef = useRef(sessionSettings);
+  useEffect(() => {
+    sessionSettingsRef.current = sessionSettings;
+  }, [sessionSettings]);
+
   // On Web, mount CometChat Calls SDK into container when call is active
   useEffect(() => {
     if (Platform.OS !== 'web' || callState !== 'active' || !callToken) return;
@@ -669,7 +679,7 @@ export function ActiveCallModal({
             }
           }
           console.log('[WebCall] Mounting CometChat WebRTC conference into container...');
-          const res = await cometchatService.startWebSession(callToken, sessionSettings, container);
+          const res = await cometchatService.startWebSession(callToken, sessionSettingsRef.current || sessionSettings, container);
           if (!res.success && isMounted) {
             console.warn('[WebCall] Failed to start web session:', res.error);
           } else if (isMounted) {
@@ -696,7 +706,7 @@ export function ActiveCallModal({
         cometchatService.leaveSession();
       }
     };
-  }, [callState, callToken, sessionSettings]);
+  }, [callState, callToken]);
 
 
 
@@ -730,13 +740,22 @@ export function ActiveCallModal({
     setIsMuted((prev) => !prev);
   }, []);
 
-  // Capture leave/hangup clicks in Web DOM to ensure disconnect button always ends call
+  // Capture leave/hangup clicks in Web DOM strictly inside CometChat container
   useEffect(() => {
     if (Platform.OS !== 'web' || !visible || callState !== 'active') return;
 
     const handleWebClickCapture = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null;
       if (!target) return;
+
+      // ── CRITICAL: Ignore all clicks outside CometChat's calling container ──
+      // Our custom React Native UI (sidechat, text input, send button, layout dock, etc.)
+      // has its own dedicated React handlers and must never trigger a disconnect.
+      const cometchatContainer = document.getElementById('cometchat-web-call-container');
+      if (!cometchatContainer || !cometchatContainer.contains(target)) {
+        return;
+      }
+
       const btn = target.closest('button, [role="button"], a');
       if (btn) {
         const cls = (btn.className || '').toString().toLowerCase();
@@ -744,13 +763,17 @@ export function ActiveCallModal({
         const aria = (btn.getAttribute('aria-label') || '').toLowerCase();
         const text = (((btn as any).innerText as string) || btn.textContent || '').toLowerCase();
 
-        if (
-          cls.includes('leave') || cls.includes('hangup') || cls.includes('end') ||
-          title.includes('leave') || title.includes('end') || title.includes('hang up') ||
-          aria.includes('leave') || aria.includes('end') || aria.includes('hang up') ||
-          text.includes('leave') || text.includes('end') || text.includes('hang up')
-        ) {
-          console.log('[ActiveCallModal Web] User clicked leave/hangup in DOM, ending call');
+        // Use strict regex with word boundaries to match leave/hangup/end call without matching "send"
+        const isLeaveOrHangup =
+          cls.includes('leave') ||
+          cls.includes('hangup') ||
+          cls.includes('end-call') ||
+          /\b(leave\s*(session|call)?|end\s*call|hang\s*up)\b/i.test(title) ||
+          /\b(leave\s*(session|call)?|end\s*call|hang\s*up)\b/i.test(aria) ||
+          /\b(leave\s*(session|call)?|end\s*call|hang\s*up)\b/i.test(text);
+
+        if (isLeaveOrHangup) {
+          console.log('[ActiveCallModal Web] User clicked CometChat leave/hangup in container, ending call');
           handleEndCall();
         }
       }
