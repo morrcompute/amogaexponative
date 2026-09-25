@@ -37,7 +37,8 @@
         "android.permission.FOREGROUND_SERVICE_MICROPHONE",
         "android.permission.FOREGROUND_SERVICE_CAMERA",
         "android.permission.SYSTEM_ALERT_WINDOW",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.WAKE_LOCK"
       ]
     },
     "web": {
@@ -70,7 +71,14 @@
         }
       ],
       "expo-audio",
-      "expo-video",
+      [
+        "expo-video",
+        {
+          "supportsPictureInPicture": true,
+          "supportsBackgroundPlayback": true
+        }
+      ],
+      "./plugins/with-webrtc-screenshare.js",
       "expo-sharing",
       "expo-image"
     ],

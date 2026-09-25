@@ -3,6 +3,7 @@ const path = require('path');
 
 const targetCjs = path.resolve(__dirname, '../node_modules/@cometchat/calls-sdk-react-native/dist/index.js');
 const targetMjs = path.resolve(__dirname, '../node_modules/@cometchat/calls-sdk-react-native/dist/index.mjs');
+const targetWebRTC = path.resolve(__dirname, '../node_modules/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/WebRTCModuleOptions.java');
 
 function patchFile(filePath, targetPattern, replacementStr) {
   if (!fs.existsSync(filePath)) {
@@ -23,16 +24,31 @@ function patchFile(filePath, targetPattern, replacementStr) {
   console.log(`[patch-cometchat] Successfully patched: ${filePath}`);
 }
 
-// Patch CJS
+// 1. Patch CJS for CometChatCalls screen sharing
 patchFile(
   targetCjs,
   'exports.CometChatCalls=CometChatCalls;',
   'CometChatCalls.startScreenSharing=startScreenSharing;CometChatCalls.stopScreenSharing=stopScreenSharing;exports.CometChatCalls=CometChatCalls;'
 );
 
-// Patch ESM
+// 2. Patch ESM for CometChatCalls screen sharing
 patchFile(
   targetMjs,
   'export{CometChatCalls};',
   'CometChatCalls.startScreenSharing=startScreenSharing;CometChatCalls.stopScreenSharing=stopScreenSharing;export{CometChatCalls};'
 );
+
+// 3. Patch WebRTCModuleOptions to enable MediaProjectionService by default on Android
+if (fs.existsSync(targetWebRTC)) {
+  let webrtcCode = fs.readFileSync(targetWebRTC, 'utf8');
+  if (webrtcCode.includes('public boolean enableMediaProjectionService;') && !webrtcCode.includes('enableMediaProjectionService = true;')) {
+    webrtcCode = webrtcCode.replace(
+      'public boolean enableMediaProjectionService;',
+      'public boolean enableMediaProjectionService = true;'
+    );
+    fs.writeFileSync(targetWebRTC, webrtcCode, 'utf8');
+    console.log('[patch-cometchat] Successfully patched WebRTCModuleOptions.enableMediaProjectionService = true');
+  } else {
+    console.log('[patch-cometchat] WebRTCModuleOptions already configured');
+  }
+}
