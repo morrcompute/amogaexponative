@@ -576,7 +576,7 @@ export function useChat() {
           setUploadingFileName(fileName);
           setUploadingFileSize(asset.fileSize || null);
           setIsSending(true);
-          const publicUrl = await uploadChatAttachment(asset.uri, fileName, mimeType, asset.base64 || undefined);
+          const publicUrl = await uploadChatAttachment(asset.uri, fileName, mimeType, asset.base64 || undefined, undefined, user.email);
           const finalUrl = publicUrl || (asset.base64 ? `data:${mimeType};base64,${asset.base64}` : asset.uri);
 
           await sendChatMessage({
@@ -608,7 +608,7 @@ export function useChat() {
           setUploadingFileName(fileName);
           setUploadingFileSize(asset.fileSize || null);
           setIsSending(true);
-          const publicUrl = await uploadChatAttachment(asset.uri, fileName, mimeType);
+          const publicUrl = await uploadChatAttachment(asset.uri, fileName, mimeType, undefined, undefined, user.email);
           const finalUrl = publicUrl || asset.uri;
 
           await sendChatMessage({
@@ -677,7 +677,7 @@ export function useChat() {
             }
           }
 
-          const publicUrl = await uploadChatAttachment(readableUri, fileName, mimeType, base64Data);
+          const publicUrl = await uploadChatAttachment(readableUri, fileName, mimeType, base64Data, undefined, user.email);
 
           // publicUrl could be:
           // 1. A Supabase HTTPS URL (best case - viewable in WebView)
@@ -792,7 +792,7 @@ export function useChat() {
         const fileName = `camera_${Date.now()}.jpg`;
         setUploadingFileName(fileName);
         setIsSending(true);
-        const publicUrl = await uploadChatAttachment(asset.uri, fileName, 'image/jpeg', asset.base64 || undefined);
+        const publicUrl = await uploadChatAttachment(asset.uri, fileName, 'image/jpeg', asset.base64 || undefined, undefined, user.email);
         const finalUrl = publicUrl || (asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
         await sendChatMessage({
           conversationId: activeConversationId,
@@ -862,7 +862,7 @@ export function useChat() {
         }
       }
 
-      const publicUrl = await uploadChatAttachment(readableUri, fileName, 'audio/m4a', base64Data);
+      const publicUrl = await uploadChatAttachment(readableUri, fileName, 'audio/m4a', base64Data, undefined, user.email);
       const finalUrl = publicUrl || (base64Data ? `data:audio/m4a;base64,${base64Data}` : readableUri);
 
       await sendChatMessage({

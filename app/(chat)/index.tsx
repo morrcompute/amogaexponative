@@ -57,6 +57,7 @@ import {
 } from 'amogamobileds-v1';
 import { supabase } from '@/lib/supabase';
 import { ChevronLeft, LogOut, Sun, Moon, X, UserPlus, Menu, Command, MapPin } from 'lucide-react-native';
+import { FilesAppView } from '@/components/files/files-app-view';
 
 export default function MobileChatScreen() {
   const insets = useSafeAreaInsets();
@@ -1297,6 +1298,22 @@ export default function MobileChatScreen() {
             onViewStateChange={({ isDetailOpen, isComposing }) => {
               setIsEmailDetailOrCompose(isDetailOpen || isComposing);
             }}
+          />
+        </View>
+      ) : activeMenuId === 'files' || activeMenuId === 'file' ? (
+        /* ──────────────── Files Explorer View ──────────────── */
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: colors.background,
+            paddingBottom: insets.bottom,
+            width: '100%',
+          }}
+        >
+          <FilesAppView
+            initialCategory="Images"
+            onOpenDrawer={() => setIsDrawerOpen(true)}
+            onClose={() => setActiveMenuId('chat')}
           />
         </View>
       ) : (

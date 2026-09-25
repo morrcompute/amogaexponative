@@ -300,31 +300,50 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
 }
 
 /**
- * Upload attachment to Supabase Storage 'amogachatfiles' bucket (with 'chat-files' fallback).
- * Organized into sub-folders: Videos, Voice, Images, Files, Links.
+ * Upload attachment to Supabase Storage 'chat-files' bucket.
+ * Organized into user-specific folder structure: Chat/<user_email>/<Category>/<filename>
  */
 export async function uploadChatAttachment(
   fileUri: string,
   fileName: string,
   mimeType: string,
   base64Data?: string,
-  targetFolder?: 'Videos' | 'Voice' | 'Images' | 'Files' | 'Links' | string
+  targetFolder?: string,
+  userEmail?: string
 ): Promise<string | null> {
   try {
     const ext = fileName.split('.').pop() || 'dat';
     const cleanName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
     
-    // Auto-detect folder if not explicitly specified
-    let folder = targetFolder;
-    if (!folder) {
-      if (mimeType.startsWith('image/')) folder = 'Images';
-      else if (mimeType.startsWith('video/')) folder = 'Videos';
-      else if (mimeType.startsWith('audio/')) folder = 'Voice';
-      else folder = 'Files';
+    // Auto-detect folder / category
+    let category = 'Others';
+    const lowerExt = ext.toLowerCase();
+    const lowerMime = (mimeType || '').toLowerCase();
+
+    if (['png', 'jpg', 'jpeg', 'svg', 'webp', 'gif', 'bmp'].includes(lowerExt) || lowerMime.startsWith('image/')) {
+      category = 'Images';
+    } else if (lowerExt === 'pdf' || lowerMime.includes('pdf')) {
+      category = 'Pdf';
+    } else if (['doc', 'docx', 'txt', 'rtf', 'odt'].includes(lowerExt) || lowerMime.includes('word') || lowerMime.includes('text')) {
+      category = 'Doc';
+    } else if (['xls', 'xlsx', 'csv'].includes(lowerExt) || lowerMime.includes('sheet') || lowerMime.includes('excel')) {
+      category = 'Xls';
+    } else if (['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp'].includes(lowerExt) || lowerMime.startsWith('video/')) {
+      category = 'Videos';
+    } else if (['mp3', 'm4a', 'wav', 'aac', 'ogg', 'flac'].includes(lowerExt) || lowerMime.startsWith('audio/')) {
+      category = 'Audio';
     }
 
-    const filePath = `${folder}/${cleanName}`;
-    const bucketsToTry = ['amogachatfiles', 'chat-files'];
+    let filePath = '';
+    if (targetFolder) {
+      filePath = `${targetFolder}/${cleanName}`;
+    } else if (userEmail) {
+      filePath = `Chat/${userEmail}/${category}/${cleanName}`;
+    } else {
+      filePath = `Chat/general/${category}/${cleanName}`;
+    }
+
+    const bucketsToTry = ['chat-files', 'amogachatfiles', 'files'];
 
     for (const bucket of bucketsToTry) {
       // ── Tier 0: Native FileSystem streaming (Android & iOS) ──────────────────
