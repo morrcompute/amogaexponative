@@ -780,9 +780,10 @@ export function ActiveCallModal({
                   {/* Left: Call Timer or Group Badge */}
                   {isGroupCall ? (
                     <View style={styles.nativeGroupBadge}>
+                      <View style={styles.timerLiveDot} />
                       <Users size={13} color="#38bdf8" style={{ marginRight: 5 }} />
                       <Text style={styles.nativeGroupBadgeText} numberOfLines={1}>
-                        {groupName || 'Group Call'} ({participantCount})
+                        {groupName || 'Group Call'}{participantCount ? ` (${participantCount})` : ''} • {formatDuration(callDuration)}
                       </Text>
                     </View>
                   ) : (

@@ -522,7 +522,7 @@ export default function ChatWebScreen() {
     );
   }, [contacts, otherMember, isDirect]);
 
-  const { startCall } = useCall();
+  const { startCall, startGroupCall } = useCall();
 
   const handleStartCall = useCallback(
     (type: 'audio' | 'video') => {
@@ -544,10 +544,11 @@ export default function ChatWebScreen() {
           type
         );
       } else {
-        toast.info('Group calling is coming soon.');
+        // Multi-Party Group Audio or Video Call on Web
+        startGroupCall(activeConversation, type);
       }
     },
-    [activeConversation, startCall, toast]
+    [activeConversation, startCall, startGroupCall, toast]
   );
 
   // Auto-select first chat on desktop

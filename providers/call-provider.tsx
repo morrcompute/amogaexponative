@@ -406,32 +406,52 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Broadcast group call invitation to all member personal signaling channels
-        const members = conversation.members || [];
-        members.forEach((m: any) => {
-          if (m.id && m.id !== user.id) {
-            const channel = supabase.channel(`call_signals_${m.id}`);
-            channel.subscribe((status) => {
-              if (status === 'SUBSCRIBED') {
-                channel.send({
-                  type: 'broadcast',
-                  event: 'call_invitation',
-                  payload: {
-                    sessionId: newSessionId,
-                    callType: type,
-                    isGroupCall: true,
-                    groupId: conversation.id,
-                    groupName: groupName,
-                    caller: {
-                      id: user.id,
-                      name: displayName,
-                      avatar: avatarUrl,
-                    },
-                  },
-                });
-                setTimeout(() => supabase.removeChannel(channel), 1000);
-              }
-            });
+        let memberIds: string[] = [];
+        if (conversation.members && Array.isArray(conversation.members) && conversation.members.length > 0) {
+          memberIds = conversation.members
+            .map((m: any) => m?.id || m?.user_id)
+            .filter((id: string) => id && id !== user.id);
+        }
+
+        // If member list wasn't pre-loaded on conversation object, query Supabase directly
+        if (memberIds.length === 0) {
+          try {
+            const { data: memberRows } = await supabase
+              .from('conversation_members')
+              .select('user_id')
+              .eq('conversation_id', conversation.id)
+              .neq('user_id', user.id);
+            if (memberRows && memberRows.length > 0) {
+              memberIds = memberRows.map((r: any) => r.user_id).filter(Boolean);
+            }
+          } catch (fetchErr) {
+            console.warn('[CallProvider] Could not fetch group member IDs for call signaling:', fetchErr);
           }
+        }
+
+        memberIds.forEach((mId: string) => {
+          const channel = supabase.channel(`call_signals_${mId}`);
+          channel.subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+              channel.send({
+                type: 'broadcast',
+                event: 'call_invitation',
+                payload: {
+                  sessionId: newSessionId,
+                  callType: type,
+                  isGroupCall: true,
+                  groupId: conversation.id,
+                  groupName: groupName,
+                  caller: {
+                    id: user.id,
+                    name: displayName,
+                    avatar: avatarUrl,
+                  },
+                },
+              });
+              setTimeout(() => supabase.removeChannel(channel), 1000);
+            }
+          });
         });
 
         // Initiator directly enters active room
