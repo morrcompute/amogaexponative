@@ -219,6 +219,7 @@ export function FilesAppView({
   // State
   const [sidebarTab, setSidebarTab] = useState<SidebarTabType>('File');
   const [activeCategory, setActiveCategory] = useState<FileCategoryType>(initialCategory);
+  const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false);
   const [isChatFolderExpanded, setIsChatFolderExpanded] = useState(true);
   const [isEmailFolderExpanded, setIsEmailFolderExpanded] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -230,6 +231,14 @@ export function FilesAppView({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [liveFiles, setLiveFiles] = useState<FileItem[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleSelectCategory = (cat: FileCategoryType) => {
+    setActiveCategory(cat);
+    if (!isDesktop) {
+      setIsMobileDetailOpen(true);
+      onViewStateChange?.({ isDetailOpen: true, isUploading: isUploadModalOpen });
+    }
+  };
 
   // Upload Form State
   const [uploadSubFolder, setUploadSubFolder] = useState<FileCategoryType>('Images');
@@ -846,619 +855,626 @@ export function FilesAppView({
       {/* ──────────────────────────────────────────────────────────────────────────── */}
       {/* 1. LEFT SIDEBAR: HIERARCHICAL FOLDER TREE (EXACT SCREENSHOT MATCH)           */}
       {/* ──────────────────────────────────────────────────────────────────────────── */}
-      <View
-        style={[
-          styles.sidebar,
-          {
-            width: isDesktop ? 290 : '100%',
-            borderRightWidth: 1,
-            borderRightColor: borderColor,
-            backgroundColor: sidebarBg,
-          },
-        ]}
-      >
-        {/* Mobile Top Bar */}
-        {!isDesktop && showMobileHeader && (
-          <View style={[styles.mobileTopBar, { borderBottomColor: borderColor }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={onOpenDrawer}
-                style={[styles.mobileLogoBadge, { backgroundColor: primaryPurple }]}
-                accessibilityRole="button"
-                accessibilityLabel="Open Navigation Menu"
-              >
-                <Command size={18} color="#ffffff" strokeWidth={2.4} />
-              </TouchableOpacity>
-              <Text style={[styles.mobileTopBarTitle, { color: textMain }]}>
-                Messages
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* A. Subtabs: File | My Files | Recent */}
-        <View style={[styles.tabsRow, { borderBottomColor: borderColor }]}>
-          <TouchableOpacity
-            onPress={() => setSidebarTab('File')}
-            style={styles.tabBtn}
-          >
-            <Text
-              style={[
-                styles.tabLabel,
-                {
-                  color: sidebarTab === 'File' ? textMain : textMuted,
-                  fontWeight: sidebarTab === 'File' ? '700' : '500',
-                },
-              ]}
-            >
-              All Files
-            </Text>
-            {sidebarTab === 'File' && (
-              <View style={[styles.activeIndicator, { backgroundColor: primaryPurple }]} />
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => setSidebarTab('My Files')}
-            style={styles.tabBtn}
-          >
-            <Text
-              style={[
-                styles.tabLabel,
-                {
-                  color: sidebarTab === 'My Files' ? textMain : textMuted,
-                  fontWeight: sidebarTab === 'My Files' ? '700' : '500',
-                },
-              ]}
-            >
-              My Files
-            </Text>
-            {sidebarTab === 'My Files' && (
-              <View style={[styles.activeIndicator, { backgroundColor: primaryPurple }]} />
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => setSidebarTab('Recent')}
-            style={styles.tabBtn}
-          >
-            <Text
-              style={[
-                styles.tabLabel,
-                {
-                  color: sidebarTab === 'Recent' ? textMain : textMuted,
-                  fontWeight: sidebarTab === 'Recent' ? '700' : '500',
-                },
-              ]}
-            >
-              Recent
-            </Text>
-            {sidebarTab === 'Recent' && (
-              <View style={[styles.activeIndicator, { backgroundColor: primaryPurple }]} />
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* B. Search + Upload Row */}
-        <View style={styles.searchUploadRow}>
-          <View
-            style={[
-              styles.searchWrapper,
-              {
-                borderColor,
-                backgroundColor: inputBg,
-              },
-            ]}
-          >
-            <Search size={14} color={textMuted} strokeWidth={2} />
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search..."
-              placeholderTextColor={textMuted}
-              style={[styles.searchInput, { color: textMain }]}
-            />
-          </View>
-
-          <TouchableOpacity
-            onPress={() => setIsUploadModalOpen(true)}
-            style={[styles.uploadPurpleBtn, { backgroundColor: primaryPurple }]}
-            accessibilityLabel="Upload file"
-          >
-            <Text style={styles.uploadPurpleBtnText}>Upload</Text>
-            <Plus size={14} color="#ffffff" strokeWidth={2.6} />
-          </TouchableOpacity>
-        </View>
-
-        {/* C. Section Header: FILE EXPLORER */}
-        <View style={styles.treeSectionHeader}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Folder size={14} color={textMuted} />
-            <Text style={[styles.treeSectionTitle, { color: textMuted }]}>
-              FILE EXPLORER
-            </Text>
-          </View>
-          <Text style={[styles.treeSectionCount, { color: textMuted }]}>
-            {CATEGORY_LIST.length}
-          </Text>
-        </View>
-
-        {/* D. Hierarchical Collapsible Folder Tree */}
-        <ScrollView
-          style={styles.treeScroll}
-          contentContainerStyle={styles.treeContent}
-          showsVerticalScrollIndicator={false}
+      {(isDesktop || !isMobileDetailOpen) && (
+        <View
+          style={[
+            styles.sidebar,
+            {
+              width: isDesktop ? 290 : '100%',
+              borderRightWidth: isDesktop ? 1 : 0,
+              borderRightColor: borderColor,
+              backgroundColor: sidebarBg,
+            },
+          ]}
         >
-          {/* Level 1: Chat Root Folder */}
-          <View style={styles.treeNode}>
+          {/* Subtabs: All Files | My Files | Recent */}
+          <View style={[styles.tabsRow, { borderBottomColor: borderColor }]}>
             <TouchableOpacity
-              onPress={() => setIsChatFolderExpanded(!isChatFolderExpanded)}
-              style={styles.treeRowLevel1}
+              onPress={() => setSidebarTab('File')}
+              style={styles.tabBtn}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                {isChatFolderExpanded ? (
-                  <ChevronDown size={14} color={textMuted} />
-                ) : (
-                  <ChevronRight size={14} color={textMuted} />
-                )}
-                <Folder size={17} color={primaryPurple} />
-                <Text style={[styles.treeNodeTitle, { color: textMain }]}>
-                  Chat
-                </Text>
-              </View>
-
-              <Text style={[styles.treeNodeCountMuted, { color: textMuted }]}>
-                {totalChatFilesCount}
+              <Text
+                style={[
+                  styles.tabLabel,
+                  {
+                    color: sidebarTab === 'File' ? textMain : textMuted,
+                    fontWeight: sidebarTab === 'File' ? '700' : '500',
+                  },
+                ]}
+              >
+                All Files
               </Text>
+              {sidebarTab === 'File' && (
+                <View style={[styles.activeIndicator, { backgroundColor: primaryPurple }]} />
+              )}
             </TouchableOpacity>
 
-            {/* Level 2: User Email Folder (e.g. itsaman00786@gmail.com) */}
-            {isChatFolderExpanded && (
-              <View style={styles.treeLevel2Wrap}>
-                <TouchableOpacity
-                  onPress={() => setIsEmailFolderExpanded(!isEmailFolderExpanded)}
-                  style={styles.treeRowLevel2}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-                    {isEmailFolderExpanded ? (
-                      <ChevronDown size={13} color={textMuted} />
-                    ) : (
-                      <ChevronRight size={13} color={textMuted} />
-                    )}
-                    <Folder size={15} color="#8b5cf6" />
-                    <Text
-                      style={[styles.treeNodeEmailTitle, { color: textMain }]}
-                      numberOfLines={1}
-                    >
-                      {userEmail}
-                    </Text>
-                  </View>
+            <TouchableOpacity
+              onPress={() => setSidebarTab('My Files')}
+              style={styles.tabBtn}
+            >
+              <Text
+                style={[
+                  styles.tabLabel,
+                  {
+                    color: sidebarTab === 'My Files' ? textMain : textMuted,
+                    fontWeight: sidebarTab === 'My Files' ? '700' : '500',
+                  },
+                ]}
+              >
+                My Files
+              </Text>
+              {sidebarTab === 'My Files' && (
+                <View style={[styles.activeIndicator, { backgroundColor: primaryPurple }]} />
+              )}
+            </TouchableOpacity>
 
-                  <Text style={[styles.treeNodeCountMuted, { color: textMuted }]}>
-                    {totalChatFilesCount}
+            <TouchableOpacity
+              onPress={() => setSidebarTab('Recent')}
+              style={styles.tabBtn}
+            >
+              <Text
+                style={[
+                  styles.tabLabel,
+                  {
+                    color: sidebarTab === 'Recent' ? textMain : textMuted,
+                    fontWeight: sidebarTab === 'Recent' ? '700' : '500',
+                  },
+                ]}
+              >
+                Recent
+              </Text>
+              {sidebarTab === 'Recent' && (
+                <View style={[styles.activeIndicator, { backgroundColor: primaryPurple }]} />
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Search + Upload Row */}
+          <View style={styles.searchUploadRow}>
+            <View
+              style={[
+                styles.searchWrapper,
+                {
+                  borderColor,
+                  backgroundColor: inputBg,
+                },
+              ]}
+            >
+              <Search size={14} color={textMuted} strokeWidth={2} />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search..."
+                placeholderTextColor={textMuted}
+                style={[styles.searchInput, { color: textMain }]}
+              />
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setIsUploadModalOpen(true)}
+              style={[styles.uploadPurpleBtn, { backgroundColor: primaryPurple }]}
+              accessibilityLabel="Upload file"
+            >
+              <Text style={styles.uploadPurpleBtnText}>Upload</Text>
+              <Plus size={14} color="#ffffff" strokeWidth={2.6} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Section Header: FILE EXPLORER */}
+          <View style={styles.treeSectionHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Folder size={14} color={textMuted} />
+              <Text style={[styles.treeSectionTitle, { color: textMuted }]}>
+                FILE EXPLORER
+              </Text>
+            </View>
+            <Text style={[styles.treeSectionCount, { color: textMuted }]}>
+              {CATEGORY_LIST.length}
+            </Text>
+          </View>
+
+          {/* Hierarchical Collapsible Folder Tree */}
+          <ScrollView
+            style={styles.treeScroll}
+            contentContainerStyle={styles.treeContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Level 1: Chat Root Folder */}
+            <View style={styles.treeNode}>
+              <TouchableOpacity
+                onPress={() => setIsChatFolderExpanded(!isChatFolderExpanded)}
+                style={styles.treeRowLevel1}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  {isChatFolderExpanded ? (
+                    <ChevronDown size={14} color={textMuted} />
+                  ) : (
+                    <ChevronRight size={14} color={textMuted} />
+                  )}
+                  <Folder size={17} color={primaryPurple} />
+                  <Text style={[styles.treeNodeTitle, { color: textMain }]}>
+                    Chat
                   </Text>
-                </TouchableOpacity>
+                </View>
 
-                {/* Level 3: Subfolders (Images, Pdf, Doc, Videos, Xls, Audio) */}
-                {isEmailFolderExpanded && (
-                  <View style={styles.treeLevel3Wrap}>
-                    {CATEGORY_LIST.map((catItem) => {
-                      const isSelected = activeCategory === catItem.category;
-                      const count = categoryCounts[catItem.category] || 0;
-                      return (
-                        <TouchableOpacity
-                          key={catItem.id}
-                          onPress={() => setActiveCategory(catItem.category)}
-                          style={[
-                            styles.treeCategoryRow,
-                            isSelected && {
-                              backgroundColor: isDark
-                                ? 'rgba(99, 102, 241, 0.18)'
-                                : '#eef2ff',
-                              borderColor: isDark
-                                ? 'rgba(99, 102, 241, 0.45)'
-                                : '#c7d2fe',
-                              borderWidth: 1,
-                            },
-                          ]}
-                        >
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <Folder
-                              size={15}
-                              color={isSelected ? primaryPurple : textMuted}
-                            />
-                            <Text
-                              style={[
-                                styles.categoryNameText,
-                                {
-                                  color: isSelected ? primaryPurple : textMain,
-                                  fontWeight: isSelected ? '700' : '500',
-                                },
-                              ]}
-                            >
-                              {catItem.category}
-                            </Text>
-                          </View>
+                <Text style={[styles.treeNodeCountMuted, { color: textMuted }]}>
+                  {totalChatFilesCount}
+                </Text>
+              </TouchableOpacity>
 
-                          <View
+              {/* Level 2: User Email Folder (e.g. itsaman00786@gmail.com) */}
+              {isChatFolderExpanded && (
+                <View style={styles.treeLevel2Wrap}>
+                  <TouchableOpacity
+                    onPress={() => setIsEmailFolderExpanded(!isEmailFolderExpanded)}
+                    style={styles.treeRowLevel2}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                      {isEmailFolderExpanded ? (
+                        <ChevronDown size={13} color={textMuted} />
+                      ) : (
+                        <ChevronRight size={13} color={textMuted} />
+                      )}
+                      <Folder size={15} color="#8b5cf6" />
+                      <Text
+                        style={[styles.treeNodeEmailTitle, { color: textMain }]}
+                        numberOfLines={1}
+                      >
+                        {userEmail}
+                      </Text>
+                    </View>
+
+                    <Text style={[styles.treeNodeCountMuted, { color: textMuted }]}>
+                      {totalChatFilesCount}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Level 3: Subfolders (Images, Pdf, Doc, Videos, Xls, Audio) */}
+                  {isEmailFolderExpanded && (
+                    <View style={styles.treeLevel3Wrap}>
+                      {CATEGORY_LIST.map((catItem) => {
+                        const isSelected = activeCategory === catItem.category;
+                        const count = categoryCounts[catItem.category] || 0;
+                        return (
+                          <TouchableOpacity
+                            key={catItem.id}
+                            onPress={() => handleSelectCategory(catItem.category)}
                             style={[
-                              styles.categoryCountBadge,
-                              {
-                                backgroundColor: isSelected
-                                  ? primaryPurple
-                                  : isDark
-                                    ? '#1e293b'
-                                    : '#f1f5f9',
+                              styles.treeCategoryRow,
+                              isSelected && {
+                                backgroundColor: isDark
+                                  ? 'rgba(99, 102, 241, 0.18)'
+                                  : '#eef2ff',
+                                borderColor: isDark
+                                  ? 'rgba(99, 102, 241, 0.45)'
+                                  : '#c7d2fe',
+                                borderWidth: 1,
                               },
                             ]}
                           >
-                            <Text
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                              <Folder
+                                size={15}
+                                color={isSelected ? primaryPurple : textMuted}
+                              />
+                              <Text
+                                style={[
+                                  styles.categoryNameText,
+                                  {
+                                    color: isSelected ? primaryPurple : textMain,
+                                    fontWeight: isSelected ? '700' : '500',
+                                  },
+                                ]}
+                              >
+                                {catItem.category}
+                              </Text>
+                            </View>
+
+                            <View
                               style={[
-                                styles.categoryCountText,
-                                { color: isSelected ? '#ffffff' : textMuted },
+                                styles.categoryCountBadge,
+                                {
+                                  backgroundColor: isSelected
+                                    ? primaryPurple
+                                    : isDark
+                                      ? '#1e293b'
+                                      : '#f1f5f9',
+                                },
                               ]}
                             >
-                              {count}
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
-              </View>
-            )}
-          </View>
-        </ScrollView>
-      </View>
+                              <Text
+                                style={[
+                                  styles.categoryCountText,
+                                  { color: isSelected ? '#ffffff' : textMuted },
+                                ]}
+                              >
+                                {count}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+          </ScrollView>
+        </View>
+      )}
 
       {/* ──────────────────────────────────────────────────────────────────────────── */}
       {/* 2. RIGHT VIEWPORT (EXACT SCREENSHOT MATCH)                                   */}
       {/* ──────────────────────────────────────────────────────────────────────────── */}
-      <View style={styles.rightViewport}>
-        {rightOverlayView ? (
-          rightOverlayView
-        ) : (
-          <>
-            {/* A. Right Top Header Bar */}
-            <View
-              style={[
-                styles.rightHeaderBar,
-                {
-                  borderBottomColor: borderColor,
-                  backgroundColor: containerBg,
-                },
-              ]}
-            >
-              <View style={styles.rightHeaderLeft}>
-                {!isDesktop && (
-                  <TouchableOpacity
-                    onPress={onOpenDrawer}
-                    style={styles.backBtn}
-                  >
-                    <ChevronLeft size={20} color={textMain} />
-                  </TouchableOpacity>
-                )}
-
-                {/* Big Purple Folder Icon Box */}
-                <View style={styles.folderIconBox}>
-                  <Folder size={18} color={primaryPurple} />
-                </View>
-
-                {/* Title & Storage Path */}
-                <View style={{ gap: 2 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={[styles.rightHeaderTitle, { color: textMain }]}>
-                      {sidebarTab === 'Recent'
-                        ? 'Recent Files'
-                        : sidebarTab === 'My Files'
-                        ? `${activeCategory} (My Files)`
-                        : activeCategory}
-                    </Text>
-                    <View style={styles.filesCountPill}>
-                      <Text style={styles.filesCountPillText}>
-                        {filteredFiles.length} file{filteredFiles.length === 1 ? '' : 's'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <Text style={[styles.storageFolderSub, { color: textMuted }]}>
-                    {sidebarTab === 'Recent'
-                      ? 'Recent files & chat attachments'
-                      : sidebarTab === 'My Files'
-                      ? `Storage folder: Chat/${userEmail}/${activeCategory} (Uploaded by you)`
-                      : `Storage folder: Chat/${userEmail}/${activeCategory}`}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Right Action Icons: Bell, Flag, More, Cross [X] */}
-              <View style={styles.rightHeaderRight}>
-                <TouchableOpacity style={styles.headerIconBtn}>
-                  <Bell size={18} color="#f97316" />
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.headerIconBtn}>
-                  <Flag size={18} color={textMuted} />
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.headerIconBtn}>
-                  <MoreVertical size={18} color={textMuted} />
-                </TouchableOpacity>
-
-                {/* Cross [X] ALWAYS ON FAR RIGHT */}
-                {(onClose || onCloseRightPane) && (
-                  <TouchableOpacity
-                    onPress={onClose || onCloseRightPane}
-                    style={[styles.closeCrossBtn, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}
-                    accessibilityRole="button"
-                    accessibilityLabel="Close Files View"
-                  >
-                    <X size={16} color={textMain} strokeWidth={2.2} />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-
-            {/* B. Main Interactive Content Canvas */}
-            <ScrollView
-              style={styles.mainCanvas}
-              contentContainerStyle={styles.mainCanvasContent}
-              showsVerticalScrollIndicator={false}
-            >
-              {/* 1. Controls Row (LTR, FILTER, SORT, SHORT, VIEW: CARD) */}
-              <View style={styles.controlsRow}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <TouchableOpacity
-                    onPress={() => {}}
-                    style={[styles.outlinePillBtn, { borderColor }]}
-                  >
-                    <ArrowLeftRight size={13} color={textMain} />
-                    <Text style={[styles.outlinePillText, { color: textMain }]}>
-                      LTR
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => {}}
-                    style={[styles.outlinePillBtn, { borderColor }]}
-                  >
-                    <Filter size={13} color={textMain} />
-                    <Text style={[styles.outlinePillText, { color: textMain }]}>
-                      FILTER
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => {
-                      setSortOrder((prev) =>
-                        prev === 'newest'
-                          ? 'oldest'
-                          : prev === 'oldest'
-                            ? 'name'
-                            : prev === 'name'
-                              ? 'size'
-                              : 'newest'
-                      );
-                    }}
-                    style={[styles.outlinePillBtn, { borderColor }]}
-                  >
-                    <ArrowUpDown size={13} color={textMain} />
-                    <Text style={[styles.outlinePillText, { color: textMain }]}>
-                      SORT
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => {}}
-                    style={[styles.outlinePillBtn, { borderColor }]}
-                  >
-                    <SlidersHorizontal size={13} color={textMain} />
-                    <Text style={[styles.outlinePillText, { color: textMain }]}>
-                      SHORT
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Solid Purple VIEW: CARD Button */}
-                <TouchableOpacity
-                  onPress={() => setViewCardMode(!viewCardMode)}
-                  style={[styles.purpleViewCardBtn, { backgroundColor: primaryPurple }]}
-                >
-                  <LayoutGrid size={14} color="#ffffff" />
-                  <Text style={styles.purpleViewCardBtnText}>VIEW: CARD</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* 2. Search Bar */}
+      {(isDesktop || isMobileDetailOpen) && (
+        <View style={styles.rightViewport}>
+          {rightOverlayView ? (
+            rightOverlayView
+          ) : (
+            <>
+              {/* A. Right Top Header Bar */}
               <View
                 style={[
-                  styles.canvasSearchWrapper,
+                  styles.rightHeaderBar,
                   {
-                    borderColor,
-                    backgroundColor: inputBg,
+                    borderBottomColor: borderColor,
+                    backgroundColor: containerBg,
                   },
                 ]}
               >
-                <Search size={16} color={textMuted} strokeWidth={2} />
-                <TextInput
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  placeholder="Search files by name, format, or sender..."
-                  placeholderTextColor={textMuted}
-                  style={[styles.canvasSearchInput, { color: textMain }]}
-                />
-                {searchQuery.length > 0 && (
-                  <TouchableOpacity onPress={() => setSearchQuery('')}>
-                    <X size={15} color={textMuted} />
-                  </TouchableOpacity>
-                )}
-              </View>
+                <View style={styles.rightHeaderLeft}>
+                  {!isDesktop && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setIsMobileDetailOpen(false);
+                        onViewStateChange?.({ isDetailOpen: false, isUploading: isUploadModalOpen });
+                      }}
+                      style={styles.backBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel="Back to Folders"
+                    >
+                      <ChevronLeft size={22} color={textMain} />
+                    </TouchableOpacity>
+                  )}
 
-              {/* 3. File Count & Pagination Row */}
-              <View style={styles.paginationRow}>
-                <Text style={[styles.paginationCountText, { color: textMuted }]}>
-                  {filteredFiles.length} files
-                </Text>
+                  {/* Big Purple Folder Icon Box */}
+                  <View style={styles.folderIconBox}>
+                    <Folder size={18} color={primaryPurple} />
+                  </View>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <Text style={[styles.paginationRangeText, { color: textMuted }]}>
-                    1–{filteredFiles.length} of {filteredFiles.length}
-                  </Text>
-                  <TouchableOpacity style={{ padding: 2 }}>
-                    <ChevronLeft size={15} color={textMuted} />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={{ padding: 2 }}>
-                    <ChevronRight size={15} color={textMuted} />
+                  {/* Title & Storage Path */}
+                  <View style={{ gap: 2, flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <Text style={[styles.rightHeaderTitle, { color: textMain }]} numberOfLines={1}>
+                        {sidebarTab === 'Recent'
+                          ? 'Recent Files'
+                          : sidebarTab === 'My Files'
+                          ? `${activeCategory} (My Files)`
+                          : activeCategory}
+                      </Text>
+                      <View style={styles.filesCountPill}>
+                        <Text style={styles.filesCountPillText}>
+                          {filteredFiles.length} file{filteredFiles.length === 1 ? '' : 's'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={[styles.storageFolderSub, { color: textMuted }]} numberOfLines={1}>
+                      {sidebarTab === 'Recent'
+                        ? 'Recent files & chat attachments'
+                        : sidebarTab === 'My Files'
+                        ? `Chat/${userEmail}/${activeCategory} (My Files)`
+                        : `Chat/${userEmail}/${activeCategory}`}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Right Action Icons: Bell, Flag, More, Cross [X] ALWAYS ON FAR RIGHT */}
+                <View style={styles.rightHeaderRight}>
+                  {isDesktop && (
+                    <>
+                      <TouchableOpacity style={styles.headerIconBtn}>
+                        <Bell size={18} color="#f97316" />
+                      </TouchableOpacity>
+
+                      <TouchableOpacity style={styles.headerIconBtn}>
+                        <Flag size={18} color={textMuted} />
+                      </TouchableOpacity>
+
+                      <TouchableOpacity style={styles.headerIconBtn}>
+                        <MoreVertical size={18} color={textMuted} />
+                      </TouchableOpacity>
+                    </>
+                  )}
+
+                  {/* Cross [X] ALWAYS ON FAR RIGHT */}
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (!isDesktop && isMobileDetailOpen) {
+                        setIsMobileDetailOpen(false);
+                        onViewStateChange?.({ isDetailOpen: false, isUploading: isUploadModalOpen });
+                      } else if (onClose || onCloseRightPane) {
+                        (onClose || onCloseRightPane)?.();
+                      }
+                    }}
+                    style={[styles.closeCrossBtn, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close"
+                  >
+                    <X size={16} color={textMain} strokeWidth={2.2} />
                   </TouchableOpacity>
                 </View>
               </View>
 
-              {/* 4. Files Cards Grid (4 in a row on desktop) */}
-              <View style={styles.cardsGrid}>
-                {filteredFiles.map((file) => (
-                  <View
-                    key={file.id}
-                    style={[
-                      styles.fileCardBox,
-                      {
-                        backgroundColor: cardBg,
-                        borderColor,
-                      },
-                    ]}
-                  >
-                    {/* Top Thumbnail Image / Preview Frame */}
+              {/* B. Main Interactive Content Canvas */}
+              <ScrollView
+                style={styles.mainCanvas}
+                contentContainerStyle={styles.mainCanvasContent}
+                showsVerticalScrollIndicator={false}
+              >
+                {/* 1. Controls Row (LTR, FILTER, SORT, SHORT, VIEW: CARD) */}
+                <View style={styles.controlsRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <TouchableOpacity
-                      activeOpacity={0.88}
-                      onPress={() => setPreviewModalFile(file)}
-                      style={[
-                        styles.fileThumbnailArea,
-                        { backgroundColor: isDark ? file.bgDark : file.bgLight },
-                      ]}
+                      onPress={() => {}}
+                      style={[styles.outlinePillBtn, { borderColor }]}
                     >
-                      {file.type === 'IMG' && file.url ? (
-                        <Image
-                          source={{ uri: file.url }}
-                          style={styles.thumbnailImg}
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <View style={{ alignItems: 'center', gap: 6, paddingVertical: 20 }}>
-                          {renderThumbnail(file, 38)}
-                          <Text
-                            style={{
-                              fontSize: 11,
-                              fontWeight: '800',
-                              color: file.color,
-                              letterSpacing: 0.5,
-                            }}
-                          >
-                            {file.badgeLabel}
-                          </Text>
-                        </View>
-                      )}
+                      <ArrowLeftRight size={13} color={textMain} />
+                      <Text style={[styles.outlinePillText, { color: textMain }]}>
+                        LTR
+                      </Text>
                     </TouchableOpacity>
 
-                    {/* File Meta Info */}
-                    <View style={{ padding: 12, gap: 4 }}>
-                      <Text
-                        style={[styles.cardFileName, { color: textMain }]}
-                        numberOfLines={1}
-                      >
-                        {file.name}
+                    <TouchableOpacity
+                      onPress={() => {}}
+                      style={[styles.outlinePillBtn, { borderColor }]}
+                    >
+                      <Filter size={13} color={textMain} />
+                      <Text style={[styles.outlinePillText, { color: textMain }]}>
+                        FILTER
                       </Text>
+                    </TouchableOpacity>
 
-                      <Text
-                        style={[styles.cardFilePath, { color: textMuted }]}
-                        numberOfLines={1}
-                      >
-                        {file.path}
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSortOrder((prev) =>
+                          prev === 'newest'
+                            ? 'oldest'
+                            : prev === 'oldest'
+                              ? 'name'
+                              : prev === 'name'
+                                ? 'size'
+                                : 'newest'
+                        );
+                      }}
+                      style={[styles.outlinePillBtn, { borderColor }]}
+                    >
+                      <ArrowUpDown size={13} color={textMain} />
+                      <Text style={[styles.outlinePillText, { color: textMain }]}>
+                        SORT
                       </Text>
+                    </TouchableOpacity>
 
-                      {/* Action Buttons Row */}
-                      <View style={styles.cardActionsRow}>
-                        <TouchableOpacity
-                          onPress={() => setPreviewModalFile(file)}
-                          style={[
-                            styles.previewBtnPill,
-                            { backgroundColor: isDark ? '#312e81' : '#ede9fe' },
-                          ]}
+                    <TouchableOpacity
+                      onPress={() => {}}
+                      style={[styles.outlinePillBtn, { borderColor }]}
+                    >
+                      <SlidersHorizontal size={13} color={textMain} />
+                      <Text style={[styles.outlinePillText, { color: textMain }]}>
+                        SHORT
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Solid Purple VIEW: CARD Button */}
+                  <TouchableOpacity
+                    onPress={() => setViewCardMode(!viewCardMode)}
+                    style={[styles.purpleViewCardBtn, { backgroundColor: primaryPurple }]}
+                  >
+                    <LayoutGrid size={14} color="#ffffff" />
+                    <Text style={styles.purpleViewCardBtnText}>VIEW: CARD</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* 2. Search Bar */}
+                <View
+                  style={[
+                    styles.canvasSearchWrapper,
+                    {
+                      borderColor,
+                      backgroundColor: inputBg,
+                    },
+                  ]}
+                >
+                  <Search size={16} color={textMuted} strokeWidth={2} />
+                  <TextInput
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    placeholder="Search files by name, format, or sender..."
+                    placeholderTextColor={textMuted}
+                    style={[styles.canvasSearchInput, { color: textMain }]}
+                  />
+                  {searchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearchQuery('')}>
+                      <X size={15} color={textMuted} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* 3. File Count & Pagination Row */}
+                <View style={styles.paginationRow}>
+                  <Text style={[styles.paginationCountText, { color: textMuted }]}>
+                    {filteredFiles.length} files
+                  </Text>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <Text style={[styles.paginationRangeText, { color: textMuted }]}>
+                      1–{filteredFiles.length} of {filteredFiles.length}
+                    </Text>
+                    <TouchableOpacity style={{ padding: 2 }}>
+                      <ChevronLeft size={15} color={textMuted} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={{ padding: 2 }}>
+                      <ChevronRight size={15} color={textMuted} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* 4. Files Cards Grid */}
+                <View style={styles.cardsGrid}>
+                  {filteredFiles.map((file) => (
+                    <View
+                      key={file.id}
+                      style={[
+                        styles.fileCardBox,
+                        {
+                          backgroundColor: cardBg,
+                          borderColor,
+                        },
+                      ]}
+                    >
+                      {/* Top Thumbnail Image / Preview Frame */}
+                      <TouchableOpacity
+                        activeOpacity={0.88}
+                        onPress={() => setPreviewModalFile(file)}
+                        style={[
+                          styles.fileThumbnailArea,
+                          { backgroundColor: isDark ? file.bgDark : file.bgLight },
+                        ]}
+                      >
+                        {file.type === 'IMG' && file.url ? (
+                          <Image
+                            source={{ uri: file.url }}
+                            style={styles.thumbnailImg}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <View style={{ alignItems: 'center', gap: 6, paddingVertical: 20 }}>
+                            {renderThumbnail(file, 38)}
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                fontWeight: '800',
+                                color: file.color,
+                                letterSpacing: 0.5,
+                              }}
+                            >
+                              {file.badgeLabel}
+                            </Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+
+                      {/* File Meta Info */}
+                      <View style={{ padding: 12, gap: 4 }}>
+                        <Text
+                          style={[styles.cardFileName, { color: textMain }]}
+                          numberOfLines={1}
                         >
-                          <Eye size={13} color="#7c3aed" />
-                          <Text style={styles.previewBtnText}>Preview</Text>
-                        </TouchableOpacity>
+                          {file.name}
+                        </Text>
 
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text
+                          style={[styles.cardFilePath, { color: textMuted }]}
+                          numberOfLines={1}
+                        >
+                          {file.path}
+                        </Text>
+
+                        {/* Action Buttons Row */}
+                        <View style={styles.cardActionsRow}>
                           <TouchableOpacity
-                            onPress={() => handleDownloadFile(file)}
-                            style={styles.cardActionIconBtn}
-                            accessibilityLabel="Download file"
+                            onPress={() => setPreviewModalFile(file)}
+                            style={[
+                              styles.previewBtnPill,
+                              { backgroundColor: isDark ? '#312e81' : '#ede9fe' },
+                            ]}
                           >
-                            <Download size={14} color={textMuted} />
+                            <Eye size={13} color="#7c3aed" />
+                            <Text style={styles.previewBtnText}>Preview</Text>
                           </TouchableOpacity>
 
-                          <TouchableOpacity
-                            onPress={() => handleCopyLink(file)}
-                            style={styles.cardActionIconBtn}
-                            accessibilityLabel="More options"
-                          >
-                            {copiedId === file.id ? (
-                              <Check size={14} color="#10b981" />
-                            ) : (
-                              <MoreVertical size={14} color={textMuted} />
-                            )}
-                          </TouchableOpacity>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <TouchableOpacity
+                              onPress={() => handleDownloadFile(file)}
+                              style={styles.cardActionIconBtn}
+                              accessibilityLabel="Download file"
+                            >
+                              <Download size={14} color={textMuted} />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              onPress={() => handleCopyLink(file)}
+                              style={styles.cardActionIconBtn}
+                              accessibilityLabel="More options"
+                            >
+                              {copiedId === file.id ? (
+                                <Check size={14} color="#10b981" />
+                              ) : (
+                                <MoreVertical size={14} color={textMuted} />
+                              )}
+                            </TouchableOpacity>
+                          </View>
                         </View>
                       </View>
                     </View>
-                  </View>
-                ))}
-              </View>
-            </ScrollView>
-          </>
-        )}
-      </View>
+                  ))}
+                </View>
+              </ScrollView>
+            </>
+          )}
+        </View>
+      )}
 
       {/* ──────────────────────────────────────────────────────────────────────────── */}
-      {/* 3. FILE PREVIEW MODAL                                                        */}
+      {/* 3. FILE PREVIEW MODAL (FULL SCREEN ON MOBILE WITH CROSS ON RIGHT)            */}
       {/* ──────────────────────────────────────────────────────────────────────────── */}
       <Modal
         visible={!!previewModalFile}
-        transparent
+        transparent={isDesktop}
         animationType="fade"
         onRequestClose={() => setPreviewModalFile(null)}
       >
-        <View style={styles.modalBackdrop}>
+        <View style={isDesktop ? styles.modalBackdrop : [styles.modalBackdropMobile, { backgroundColor: isDark ? '#09090b' : '#ffffff' }]}>
           <View
             style={[
-              styles.previewModalBox,
+              isDesktop ? styles.previewModalBox : styles.previewModalBoxMobile,
               { backgroundColor: containerBg, borderColor },
             ]}
           >
-            <View style={[styles.modalHeaderRow, { borderBottomColor: borderColor }]}>
+            {/* Header: File Name + Close Cross [X] on FAR RIGHT */}
+            <View style={[styles.modalHeaderRow, { borderBottomColor: borderColor, paddingTop: !isDesktop && Platform.OS !== 'web' ? 36 : 0 }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                 <Folder size={18} color={primaryPurple} />
                 <Text
-                  style={{ fontSize: 15, fontWeight: '800', color: textMain, flex: 1 }}
+                  style={{ fontSize: 15, fontWeight: '800', color: textMain, flex: 1, fontFamily: 'Open Sans' }}
                   numberOfLines={1}
                 >
                   {previewModalFile?.name}
                 </Text>
               </View>
 
+              {/* Cross on right */}
               <TouchableOpacity
                 onPress={() => setPreviewModalFile(null)}
                 style={[styles.modalCloseBtn, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}
+                accessibilityRole="button"
+                accessibilityLabel="Close Preview"
               >
-                <X size={16} color={textMain} strokeWidth={2.2} />
+                <X size={18} color={textMain} strokeWidth={2.4} />
               </TouchableOpacity>
             </View>
 
-            <View style={{ padding: 20, gap: 16 }}>
+            {/* Content Body */}
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={isDesktop ? { padding: 20, gap: 16 } : { padding: 16, gap: 16, paddingBottom: 40 }}
+              showsVerticalScrollIndicator={false}
+            >
               <View
                 style={[
-                  styles.modalPreviewFrame,
+                  isDesktop ? styles.modalPreviewFrame : styles.modalPreviewFrameMobile,
                   {
                     backgroundColor: isDark
                       ? previewModalFile?.bgDark
@@ -1470,61 +1486,89 @@ export function FilesAppView({
                 {previewModalFile?.type === 'IMG' && previewModalFile.url ? (
                   <Image
                     source={{ uri: previewModalFile.url }}
-                    style={{ width: '100%', height: 240, borderRadius: 10 }}
+                    style={isDesktop ? { width: '100%', height: 260, borderRadius: 10 } : { width: '100%', height: 320, borderRadius: 10 }}
                     resizeMode="contain"
                   />
                 ) : (
-                  <View style={{ alignItems: 'center', gap: 10, paddingVertical: 30 }}>
-                    {previewModalFile && renderThumbnail(previewModalFile, 54)}
+                  <View style={{ alignItems: 'center', gap: 12, paddingVertical: isDesktop ? 30 : 48 }}>
+                    {previewModalFile && renderThumbnail(previewModalFile, isDesktop ? 54 : 68)}
                     <Text
                       style={{
                         fontSize: 16,
                         fontWeight: '800',
                         color: previewModalFile?.color,
                         letterSpacing: 0.5,
+                        fontFamily: 'Open Sans',
                       }}
                     >
                       {previewModalFile?.badgeLabel} DOCUMENT
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: textMuted,
+                        textAlign: 'center',
+                        paddingHorizontal: 16,
+                        fontFamily: 'Open Sans',
+                      }}
+                      numberOfLines={2}
+                    >
+                      {previewModalFile?.name}
                     </Text>
                   </View>
                 )}
               </View>
 
+              {/* Metadata Details Box */}
               <View style={[styles.metaDetailBox, { borderColor, backgroundColor: inputBg }]}>
                 <View style={styles.metaRow}>
                   <Text style={[styles.metaLabel, { color: textMuted }]}>Storage Path:</Text>
-                  <Text style={[styles.metaValue, { color: textMain }]}>{previewModalFile?.path}</Text>
+                  <Text style={[styles.metaValue, { color: textMain }]} numberOfLines={1}>{previewModalFile?.path}</Text>
                 </View>
                 <View style={styles.metaRow}>
                   <Text style={[styles.metaLabel, { color: textMuted }]}>File Size:</Text>
                   <Text style={[styles.metaValue, { color: textMain }]}>{previewModalFile?.size}</Text>
                 </View>
                 <View style={styles.metaRow}>
-                  <Text style={[styles.metaLabel, { color: textMuted }]}>Folder:</Text>
+                  <Text style={[styles.metaLabel, { color: textMuted }]}>Folder Category:</Text>
                   <Text style={[styles.metaValue, { color: textMain }]}>{previewModalFile?.category}</Text>
+                </View>
+                <View style={styles.metaRow}>
+                  <Text style={[styles.metaLabel, { color: textMuted }]}>Date Uploaded:</Text>
+                  <Text style={[styles.metaValue, { color: textMain }]}>{previewModalFile?.date || 'Recent'}</Text>
                 </View>
               </View>
 
-              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+              {/* Action Buttons: Copy Link + Download */}
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
                 <TouchableOpacity
                   onPress={() => previewModalFile && handleCopyLink(previewModalFile)}
-                  style={[styles.outlinePillBtn, { borderColor }]}
+                  style={[styles.outlinePillBtn, { borderColor, paddingVertical: 9, paddingHorizontal: 14 }]}
                 >
-                  <Copy size={14} color={textMain} />
-                  <Text style={[styles.outlinePillText, { color: textMain }]}>Copy Link</Text>
+                  {copiedId === previewModalFile?.id ? (
+                    <>
+                      <Check size={15} color="#10b981" />
+                      <Text style={[styles.outlinePillText, { color: '#10b981' }]}>Copied!</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={15} color={textMain} />
+                      <Text style={[styles.outlinePillText, { color: textMain }]}>Copy Link</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
 
                 {previewModalFile?.url && (
                   <TouchableOpacity
                     onPress={() => handleDownloadFile(previewModalFile)}
-                    style={[styles.purpleViewCardBtn, { backgroundColor: primaryPurple }]}
+                    style={[styles.purpleViewCardBtn, { backgroundColor: primaryPurple, paddingVertical: 9, paddingHorizontal: 16 }]}
                   >
-                    <Download size={14} color="#ffffff" />
-                    <Text style={styles.purpleViewCardBtnText}>Download</Text>
+                    <Download size={15} color="#ffffff" />
+                    <Text style={[styles.purpleViewCardBtnText, { fontSize: 13 }]}>Download</Text>
                   </TouchableOpacity>
                 )}
               </View>
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -2078,12 +2122,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
   },
+  modalBackdropMobile: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
   previewModalBox: {
     width: '100%',
     maxWidth: 540,
     borderRadius: 16,
     borderWidth: 1,
     overflow: 'hidden',
+  },
+  previewModalBoxMobile: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    flexDirection: 'column',
   },
   modalHeaderRow: {
     height: 52,
@@ -2103,6 +2158,15 @@ const styles = StyleSheet.create({
   modalPreviewFrame: {
     width: '100%',
     borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  modalPreviewFrameMobile: {
+    width: '100%',
+    minHeight: 280,
+    borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',

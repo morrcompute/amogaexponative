@@ -117,9 +117,11 @@ export default function MobileChatScreen() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [externalReplyMap, setExternalReplyMap] = useState<Record<string, any>>({});
   const [isEmailDetailOrCompose, setIsEmailDetailOrCompose] = useState(false);
+  const [isFilesMobileDetailOpen, setIsFilesMobileDetailOpen] = useState(false);
 
   useEffect(() => {
     setIsEmailDetailOrCompose(false);
+    setIsFilesMobileDetailOpen(false);
   }, [activeMenuId]);
 
   useEffect(() => {
@@ -1310,10 +1312,35 @@ export default function MobileChatScreen() {
             width: '100%',
           }}
         >
+          {/* Top Bar with Logo Drawer Button and Clean Title (hidden when mobile detail is open) */}
+          {!isFilesMobileDetailOpen && (
+            <View style={[styles.userTopBar, { borderBottomColor: isDark ? colors.border : '#f1f5f9' }]}>
+              <View style={styles.userBarLeft}>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setIsDrawerOpen(true)}
+                  style={[styles.mobileLogoBadge, { backgroundColor: colors.primary }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open Navigation Menu"
+                >
+                  <Command size={18} color="#ffffff" strokeWidth={2.4} />
+                </TouchableOpacity>
+
+                <Text style={[styles.topBarTitle, { color: colors.foreground, fontSize: 16, fontWeight: '700', fontFamily: 'Open Sans' }]}>
+                  Files Explorer
+                </Text>
+              </View>
+            </View>
+          )}
+
           <FilesAppView
             initialCategory="Images"
             onOpenDrawer={() => setIsDrawerOpen(true)}
             onClose={() => setActiveMenuId('chat')}
+            showMobileHeader={false}
+            onViewStateChange={({ isDetailOpen }) => {
+              setIsFilesMobileDetailOpen(isDetailOpen);
+            }}
           />
         </View>
       ) : (

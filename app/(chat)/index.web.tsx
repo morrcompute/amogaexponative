@@ -114,9 +114,11 @@ export default function ChatWebScreen() {
   const [showContactInfo, setShowContactInfo] = useState(false);
   const [externalReplyMap, setExternalReplyMap] = useState<Record<string, any>>({});
   const [isEmailDetailOrCompose, setIsEmailDetailOrCompose] = useState(false);
+  const [isFilesMobileDetailOpen, setIsFilesMobileDetailOpen] = useState(false);
 
   useEffect(() => {
     setIsEmailDetailOrCompose(false);
+    setIsFilesMobileDetailOpen(false);
   }, [mainNavId]);
 
   useEffect(() => {
@@ -1614,7 +1616,7 @@ export default function ChatWebScreen() {
       ) : mainNavId === 'files' || mainNavId === 'file' ? (
         /* ──────────────── Files Explorer App View ──────────────── */
         <View style={{ flex: 1, height: '100%', width: '100%', display: 'flex' as any, flexDirection: 'column' }}>
-          {isMobileOrTablet && (
+          {isMobileOrTablet && !isFilesMobileDetailOpen && (
             <View
               style={[
                 styles.userTopBar,
@@ -1647,6 +1649,10 @@ export default function ChatWebScreen() {
             initialCategory="Images"
             onOpenDrawer={() => setIsDrawerOpen(true)}
             onClose={() => setMainNavId('chat')}
+            showMobileHeader={false}
+            onViewStateChange={({ isDetailOpen }) => {
+              setIsFilesMobileDetailOpen(isDetailOpen);
+            }}
             rightOverlayView={
               isAppSettingsOpen ? (
                 <AppSettingsView
