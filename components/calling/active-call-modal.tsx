@@ -307,37 +307,64 @@ export function ActiveCallModal({
     isSideChatOpenRef.current = isSideChatOpen;
   }, [isSideChatOpen]);
 
+  const chatChannelRef = useRef<any>(null);
+  const [latestChatMessage, setLatestChatMessage] = useState<{ senderName: string; text: string } | null>(null);
+  const toastTimeoutRef = useRef<any>(null);
+
   // Listen for in-call chat broadcast messages via Supabase
   useEffect(() => {
     if (!visible || callState !== 'active' || !sessionId) return;
 
-    const channel = supabase.channel(`call_chat_${sessionId}`);
+    console.log(`[InCallChat] Subscribing to call_chat_${sessionId}...`);
+    const channel = supabase.channel(`call_chat_${sessionId}`, {
+      config: {
+        broadcast: { self: false },
+      },
+    });
+
     channel
       .on('broadcast', { event: 'new_message' }, ({ payload }: any) => {
+        console.log('[InCallChat] Received incoming broadcast message:', payload);
         if (!payload || !payload.text) return;
         const isFromSelf = payload.senderId === currentUserId;
+        if (isFromSelf) return;
+
         const newMsg = {
           id: payload.id || `msg_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
           senderId: payload.senderId || 'participant',
           senderName: payload.senderName || 'Participant',
           text: payload.text,
           time: payload.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          isSelf: isFromSelf,
+          isSelf: false,
         };
+
         setInCallMessages((prev) => {
           if (prev.some((m) => m.id === newMsg.id)) return prev;
           return [...prev, newMsg];
         });
-        if (!isFromSelf && !isSideChatOpenRef.current) {
+
+        if (!isSideChatOpenRef.current) {
           setUnreadChatCount((prev) => prev + 1);
+          setLatestChatMessage({ senderName: newMsg.senderName, text: newMsg.text });
+          if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+          toastTimeoutRef.current = setTimeout(() => {
+            setLatestChatMessage(null);
+          }, 4500);
         }
+
         setTimeout(() => {
           chatScrollRef.current?.scrollToEnd({ animated: true });
         }, 100);
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`[InCallChat] Channel status for call_chat_${sessionId}:`, status);
+      });
+
+    chatChannelRef.current = channel;
 
     return () => {
+      chatChannelRef.current = null;
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
       supabase.removeChannel(channel);
     };
   }, [visible, callState, sessionId, currentUserId]);
@@ -367,23 +394,45 @@ export function ActiveCallModal({
       chatScrollRef.current?.scrollToEnd({ animated: true });
     }, 80);
 
+    // Directly transmit via active broadcast channel
     try {
-      const channel = supabase.channel(`call_chat_${sessionId}`);
-      channel.subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          channel.send({
-            type: 'broadcast',
-            event: 'new_message',
-            payload: {
-              id: msgId,
-              senderId: currentUserId || 'me',
-              senderName: myName,
-              text: trimmed,
-              time: timeStr,
-            },
-          });
-        }
-      });
+      let ch = chatChannelRef.current;
+      if (!ch) {
+        ch = supabase.channel(`call_chat_${sessionId}`, {
+          config: { broadcast: { self: false } },
+        });
+        chatChannelRef.current = ch;
+      }
+
+      const payload = {
+        id: msgId,
+        senderId: currentUserId || 'me',
+        senderName: myName,
+        text: trimmed,
+        time: timeStr,
+      };
+
+      console.log('[InCallChat] Broadcasting message:', payload);
+      if (ch.state === 'joined') {
+        const res = await ch.send({
+          type: 'broadcast',
+          event: 'new_message',
+          payload,
+        });
+        console.log('[InCallChat] Broadcast send result:', res);
+      } else {
+        ch.subscribe(async (status: string) => {
+          console.log('[InCallChat] Late subscribe status:', status);
+          if (status === 'SUBSCRIBED') {
+            const res = await ch.send({
+              type: 'broadcast',
+              event: 'new_message',
+              payload,
+            });
+            console.log('[InCallChat] Late broadcast send result:', res);
+          }
+        });
+      }
     } catch (e) {
       console.warn('[InCallChat] Error broadcasting message:', e);
     }
@@ -450,6 +499,8 @@ export function ActiveCallModal({
     setIsSideChatOpen(false);
     setInCallMessages([]);
     setUnreadChatCount(0);
+    setLatestChatMessage(null);
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     stopScreenShare();
     stopWebMedia();
     cometchatService.leaveSession();
@@ -1164,7 +1215,11 @@ export function ActiveCallModal({
                       >
                         <MessageSquare size={18} color={isSideChatOpen ? '#38bdf8' : '#ffffff'} />
                         {unreadChatCount > 0 && !isSideChatOpen && (
-                          <View style={styles.mobileChatDot} />
+                          <View style={styles.mobileChatCountBadge}>
+                            <Text style={styles.mobileChatCountText}>
+                              {unreadChatCount > 9 ? '9+' : unreadChatCount}
+                            </Text>
+                          </View>
                         )}
                       </TouchableOpacity>
                     </View>
@@ -1339,7 +1394,11 @@ export function ActiveCallModal({
                         >
                           <MessageSquare size={18} color={isSideChatOpen ? '#38bdf8' : '#ffffff'} />
                           {unreadChatCount > 0 && !isSideChatOpen && (
-                            <View style={styles.mobileChatDot} />
+                            <View style={styles.mobileChatCountBadge}>
+                              <Text style={styles.mobileChatCountText}>
+                                {unreadChatCount > 9 ? '9+' : unreadChatCount}
+                              </Text>
+                            </View>
                           )}
                         </TouchableOpacity>
                       </View>
@@ -1525,7 +1584,11 @@ export function ActiveCallModal({
                   >
                     <MessageSquare size={22} color={isSideChatOpen ? '#38bdf8' : '#ffffff'} />
                     {unreadChatCount > 0 && !isSideChatOpen && (
-                      <View style={styles.mobileChatDot} />
+                      <View style={styles.mobileChatCountBadge}>
+                        <Text style={styles.mobileChatCountText}>
+                          {unreadChatCount > 9 ? '9+' : unreadChatCount}
+                        </Text>
+                      </View>
                     )}
                   </TouchableOpacity>
 
@@ -1538,6 +1601,46 @@ export function ActiveCallModal({
                   </TouchableOpacity>
                 </View>
               </View>
+            )}
+
+            {/* Floating In-Call Chat Message Notification (Google Meet style) */}
+            {latestChatMessage && !isSideChatOpen && (
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => {
+                  setIsSideChatOpen(true);
+                  setUnreadChatCount(0);
+                  setLatestChatMessage(null);
+                }}
+                style={[
+                  styles.inCallToastContainer,
+                  isMobile
+                    ? { bottom: bottomInset + 80, left: 16, right: 16 }
+                    : { bottom: 84, left: 24, maxWidth: 360 },
+                ]}
+              >
+                <View style={styles.inCallToastIconBadge}>
+                  <MessageSquare size={15} color="#38bdf8" />
+                </View>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={styles.inCallToastSender} numberOfLines={1}>
+                    {latestChatMessage.senderName}
+                  </Text>
+                  <Text style={styles.inCallToastText} numberOfLines={1}>
+                    {latestChatMessage.text}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  onPress={(e) => {
+                    e.stopPropagation?.();
+                    setLatestChatMessage(null);
+                  }}
+                  style={styles.inCallToastCloseBtn}
+                >
+                  <X size={14} color="#94a3b8" />
+                </TouchableOpacity>
+              </TouchableOpacity>
             )}
 
             {/* In-Call Chat Sidebar (Desktop Side Dock / Mobile Fullscreen Overlay) */}
@@ -2219,5 +2322,68 @@ const styles = StyleSheet.create({
     backgroundColor: '#ef4444',
     borderWidth: 1.5,
     borderColor: '#090d16',
+  },
+  mobileChatCountBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#ef4444',
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#090d16',
+    zIndex: 10,
+  },
+  mobileChatCountText: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  inCallToastContainer: {
+    position: 'absolute',
+    zIndex: 99998,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.35)',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  inCallToastIconBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  inCallToastSender: {
+    color: '#38bdf8',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  inCallToastText: {
+    color: '#e2e8f0',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  inCallToastCloseBtn: {
+    padding: 4,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
 });
