@@ -4,6 +4,8 @@ const path = require('path');
 const targetCjs = path.resolve(__dirname, '../node_modules/@cometchat/calls-sdk-react-native/dist/index.js');
 const targetMjs = path.resolve(__dirname, '../node_modules/@cometchat/calls-sdk-react-native/dist/index.mjs');
 const targetWebRTC = path.resolve(__dirname, '../node_modules/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/WebRTCModuleOptions.java');
+const targetMediaProjectionService = path.resolve(__dirname, '../node_modules/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/MediaProjectionService.java');
+const targetGetUserMediaImpl = path.resolve(__dirname, '../node_modules/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/GetUserMediaImpl.java');
 
 function patchFile(filePath, targetPattern, replacementStr) {
   if (!fs.existsSync(filePath)) {
@@ -50,5 +52,119 @@ if (fs.existsSync(targetWebRTC)) {
     console.log('[patch-cometchat] Successfully patched WebRTCModuleOptions.enableMediaProjectionService = true');
   } else {
     console.log('[patch-cometchat] WebRTCModuleOptions already configured');
+  }
+}
+
+// 4. Patch MediaProjectionService to track isRunning state and provide OnServiceStartedListener
+if (fs.existsSync(targetMediaProjectionService)) {
+  let serviceCode = fs.readFileSync(targetMediaProjectionService, 'utf8');
+  if (!serviceCode.includes('public static volatile boolean isRunning')) {
+    const isRunningSnippet = `    static final int NOTIFICATION_ID = new Random().nextInt(99999) + 10000;
+
+    public static volatile boolean isRunning = false;
+
+    public interface OnServiceStartedListener {
+        void onStarted();
+    }
+
+    private static OnServiceStartedListener sListener;
+
+    public static synchronized void setOnServiceStartedListener(OnServiceStartedListener listener) {
+        if (isRunning && listener != null) {
+            listener.onStarted();
+        } else {
+            sListener = listener;
+        }
+    }`;
+
+    serviceCode = serviceCode.replace(
+      'static final int NOTIFICATION_ID = new Random().nextInt(99999) + 10000;',
+      isRunningSnippet
+    );
+
+    // Update onStartCommand to set isRunning = true and trigger listener
+    serviceCode = serviceCode.replace(
+      'return START_NOT_STICKY;',
+      `isRunning = true;
+        synchronized (MediaProjectionService.class) {
+            if (sListener != null) {
+                try {
+                    sListener.onStarted();
+                } catch (Exception e) {
+                    Log.e(TAG, "Error in onStarted listener", e);
+                }
+                sListener = null;
+            }
+        }
+
+        return START_NOT_STICKY;`
+    );
+
+    // Update abort to clear listener and reset isRunning
+    serviceCode = serviceCode.replace(
+      'public static void abort(Context context) {',
+      `public static void abort(Context context) {
+        isRunning = false;
+        synchronized (MediaProjectionService.class) {
+            sListener = null;
+        }`
+    );
+
+    // Add onDestroy
+    serviceCode = serviceCode.replace(
+      'public IBinder onBind(Intent intent) {\n        return null;\n    }',
+      `public IBinder onBind(Intent intent) {
+        return null;
+    }
+
+    @Override
+    public void onDestroy() {
+        isRunning = false;
+        synchronized (MediaProjectionService.class) {
+            sListener = null;
+        }
+        super.onDestroy();
+    }`
+    );
+
+    fs.writeFileSync(targetMediaProjectionService, serviceCode, 'utf8');
+    console.log('[patch-cometchat] Successfully patched MediaProjectionService with isRunning & OnServiceStartedListener');
+  } else {
+    console.log('[patch-cometchat] MediaProjectionService already patched');
+  }
+}
+
+// 5. Patch GetUserMediaImpl to wait for MediaProjectionService foreground start before getMediaProjection (fixes Android 14 SecurityException on entire screen)
+if (fs.existsSync(targetGetUserMediaImpl)) {
+  let gumCode = fs.readFileSync(targetGetUserMediaImpl, 'utf8');
+  const targetGumPattern = `                    ThreadUtils.runOnExecutor(() -> {
+                        MediaProjectionService.launch(activity);
+                        createScreenStream();
+                    });`;
+
+  const replacementGum = `                    ThreadUtils.runOnExecutor(() -> {
+                        if (WebRTCModuleOptions.getInstance().enableMediaProjectionService) {
+                            final java.util.concurrent.atomic.AtomicBoolean created = new java.util.concurrent.atomic.AtomicBoolean(false);
+                            final Runnable doCreate = () -> {
+                                if (created.compareAndSet(false, true)) {
+                                    ThreadUtils.runOnExecutor(() -> {
+                                        createScreenStream();
+                                    });
+                                }
+                            };
+                            MediaProjectionService.setOnServiceStartedListener(doCreate::run);
+                            MediaProjectionService.launch(activity);
+                            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(doCreate, 500);
+                        } else {
+                            createScreenStream();
+                        }
+                    });`;
+
+  if (gumCode.includes(targetGumPattern)) {
+    gumCode = gumCode.replace(targetGumPattern, replacementGum);
+    fs.writeFileSync(targetGetUserMediaImpl, gumCode, 'utf8');
+    console.log('[patch-cometchat] Successfully patched GetUserMediaImpl to wait for foreground service before creating screen stream');
+  } else {
+    console.log('[patch-cometchat] GetUserMediaImpl already patched or pattern changed');
   }
 }

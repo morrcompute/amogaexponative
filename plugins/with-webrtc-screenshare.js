@@ -7,7 +7,7 @@ const { withAndroidManifest, withMainActivity, createRunOncePlugin } = require('
  * 2. Enables supportsPictureInPicture & resizeableActivity on MainActivity
  * 3. Handles configChanges to prevent activity recreation during PiP / window resize
  * 4. Injects WebRTCModuleOptions enableMediaProjectionService = true
- * 5. Injects onUserLeaveHint & setAutoEnterEnabled(true) for seamless automatic Picture-in-Picture
+ * 5. Injects onUserLeaveHint so Picture-in-Picture ONLY triggers when entire screen sharing is active
  */
 function withWebRTCScreenShare(config) {
   // 1. AndroidManifest modifications
@@ -89,7 +89,7 @@ function withWebRTCScreenShare(config) {
     return config;
   });
 
-  // 2. MainActivity modifications to enable WebRTC MediaProjectionService and Auto Picture-in-Picture
+  // 2. MainActivity modifications: enable MediaProjectionService and trigger PiP ONLY when screen sharing is active
   config = withMainActivity(config, (config) => {
     let content = config.modResults.contents;
     const isKotlin = config.modResults.language === 'kt';
@@ -98,38 +98,38 @@ function withWebRTCScreenShare(config) {
       if (!content.includes('com.oney.WebRTCModule.WebRTCModuleOptions')) {
         content = content.replace(
           /package [\w.]+/,
-          (match) => `${match}\n\nimport com.oney.WebRTCModule.WebRTCModuleOptions`
+          (match) => `${match}\n\nimport com.oney.WebRTCModule.WebRTCModuleOptions\nimport com.oney.WebRTCModule.MediaProjectionService`
         );
       }
       if (!content.includes('enableMediaProjectionService = true')) {
         content = content.replace(
           /super\.onCreate\((.*)\)/,
-          (match) => `WebRTCModuleOptions.getInstance().enableMediaProjectionService = true\n    ${match}\n    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {\n      try {\n        val pipBuilder = android.app.PictureInPictureParams.Builder()\n        pipBuilder.setAspectRatio(android.util.Rational(9, 16))\n        pipBuilder.setAutoEnterEnabled(true)\n        setPictureInPictureParams(pipBuilder.build())\n      } catch (e: Exception) {}\n    }`
+          (match) => `WebRTCModuleOptions.getInstance().enableMediaProjectionService = true\n    ${match}`
         );
       }
       if (!content.includes('onUserLeaveHint()')) {
         content = content.replace(
           /class MainActivity :[^{]+{/,
-          (match) => `${match}\n  override fun onUserLeaveHint() {\n    super.onUserLeaveHint()\n    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {\n      try {\n        val pipBuilder = android.app.PictureInPictureParams.Builder()\n        pipBuilder.setAspectRatio(android.util.Rational(9, 16))\n        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {\n          pipBuilder.setAutoEnterEnabled(true)\n        }\n        enterPictureInPictureMode(pipBuilder.build())\n      } catch (e: Exception) {}\n    }\n  }\n`
+          (match) => `${match}\n  override fun onUserLeaveHint() {\n    super.onUserLeaveHint()\n    // Enter Picture-in-Picture ONLY when entire screen sharing is currently active\n    if (com.oney.WebRTCModule.MediaProjectionService.isRunning) {\n      if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {\n        try {\n          val pipBuilder = android.app.PictureInPictureParams.Builder()\n          pipBuilder.setAspectRatio(android.util.Rational(9, 16))\n          enterPictureInPictureMode(pipBuilder.build())\n        } catch (e: Exception) {}\n      }\n    }\n  }\n`
         );
       }
     } else {
       if (!content.includes('com.oney.WebRTCModule.WebRTCModuleOptions')) {
         content = content.replace(
           /package [\w.]+;/,
-          (match) => `${match}\n\nimport com.oney.WebRTCModule.WebRTCModuleOptions;`
+          (match) => `${match}\n\nimport com.oney.WebRTCModule.WebRTCModuleOptions;\nimport com.oney.WebRTCModule.MediaProjectionService;`
         );
       }
       if (!content.includes('enableMediaProjectionService = true')) {
         content = content.replace(
           /super\.onCreate\((.*)\);/,
-          (match) => `WebRTCModuleOptions.getInstance().enableMediaProjectionService = true;\n    ${match}\n    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {\n      try {\n        android.app.PictureInPictureParams.Builder pipBuilder = new android.app.PictureInPictureParams.Builder();\n        pipBuilder.setAspectRatio(new android.util.Rational(9, 16));\n        pipBuilder.setAutoEnterEnabled(true);\n        setPictureInPictureParams(pipBuilder.build());\n      } catch (Exception e) {}\n    }`
+          (match) => `WebRTCModuleOptions.getInstance().enableMediaProjectionService = true;\n    ${match}`
         );
       }
       if (!content.includes('onUserLeaveHint()')) {
         content = content.replace(
           /public class MainActivity extends[^{]+{/,
-          (match) => `${match}\n  @Override\n  public void onUserLeaveHint() {\n    super.onUserLeaveHint();\n    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {\n      try {\n        android.app.PictureInPictureParams.Builder pipBuilder = new android.app.PictureInPictureParams.Builder();\n        pipBuilder.setAspectRatio(new android.util.Rational(9, 16));\n        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {\n          pipBuilder.setAutoEnterEnabled(true);\n        }\n        enterPictureInPictureMode(pipBuilder.build());\n      } catch (Exception e) {}\n    }\n  }\n`
+          (match) => `${match}\n  @Override\n  public void onUserLeaveHint() {\n    super.onUserLeaveHint();\n    // Enter Picture-in-Picture ONLY when entire screen sharing is currently active\n    if (com.oney.WebRTCModule.MediaProjectionService.isRunning) {\n      if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {\n        try {\n          android.app.PictureInPictureParams.Builder pipBuilder = new android.app.PictureInPictureParams.Builder();\n          pipBuilder.setAspectRatio(new android.util.Rational(9, 16));\n          enterPictureInPictureMode(pipBuilder.build());\n        } catch (Exception e) {}\n      }\n    }\n  }\n`
         );
       }
     }
