@@ -2,7 +2,7 @@
   "expo": {
     "name": "amogamobiledev1",
     "slug": "amogamobiledev1",
-    "owner": "morrcompute",
+    "owner": "amannew",
     "scheme": "amogamobiledev1",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -88,7 +88,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "2129fd33-8191-44ce-8d5d-c5477548cd73"
+        "projectId": "83b25875-f165-4983-95ce-91e5b1e9fc86"
       }
     }
   }
