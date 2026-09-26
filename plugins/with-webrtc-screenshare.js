@@ -77,7 +77,6 @@ function withWebRTCScreenShare(config) {
         mainActivity.$['android:showWhenLocked'] = 'true';
         mainActivity.$['android:turnScreenOn'] = 'true';
         mainActivity.$['android:showOnLockScreen'] = 'true';
-        mainActivity.$['android:inheritedShowWhenLocked'] = 'true';
 
         // Ensure configChanges contains all necessary flags for smooth transitions
         let configChanges = mainActivity.$['android:configChanges'] || '';
