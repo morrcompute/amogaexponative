@@ -64,11 +64,12 @@ export async function registerForPushNotificationsAsync(
     // 4. Fetch Expo Push Token
     const projectId =
       Constants.expoConfig?.extra?.eas?.projectId ||
-      Constants.easConfig?.projectId;
+      Constants.easConfig?.projectId ||
+      '83b25875-f165-4983-95ce-91e5b1e9fc86';
 
-    const tokenResponse = await Notifications.getExpoPushTokenAsync(
-      projectId ? { projectId } : undefined
-    );
+    const tokenResponse = await Notifications.getExpoPushTokenAsync({
+      projectId,
+    });
     token = tokenResponse.data;
 
     // 5. Store token in Supabase for user

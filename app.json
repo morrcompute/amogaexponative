@@ -78,6 +78,15 @@
           "supportsBackgroundPlayback": true
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#f97316",
+          "sounds": [],
+          "mode": "production"
+        }
+      ],
       "./plugins/with-webrtc-screenshare.js",
       "expo-sharing",
       "expo-image"
