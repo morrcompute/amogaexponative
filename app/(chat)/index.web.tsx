@@ -50,6 +50,7 @@ import {
 import { ThemeSettingsView } from '@/components/theme-settings-view';
 import { PreferencesView } from '@/components/preferences-view';
 import { FilesAppView } from '@/components/files/files-app-view';
+import { NotificationsAppView } from '@/components/notifications/notifications-app-view';
 import { supabase } from '@/lib/supabase';
 import { UserPlus, Palette, LogOut, Sparkles, Command, ChevronLeft, Menu, X, MapPin } from 'lucide-react-native';
 
@@ -115,10 +116,12 @@ export default function ChatWebScreen() {
   const [externalReplyMap, setExternalReplyMap] = useState<Record<string, any>>({});
   const [isEmailDetailOrCompose, setIsEmailDetailOrCompose] = useState(false);
   const [isFilesMobileDetailOpen, setIsFilesMobileDetailOpen] = useState(false);
+  const [isNotificationDetailOrCompose, setIsNotificationDetailOrCompose] = useState(false);
 
   useEffect(() => {
     setIsEmailDetailOrCompose(false);
     setIsFilesMobileDetailOpen(false);
+    setIsNotificationDetailOrCompose(false);
   }, [mainNavId]);
 
   useEffect(() => {
@@ -1652,6 +1655,74 @@ export default function ChatWebScreen() {
             showMobileHeader={false}
             onViewStateChange={({ isDetailOpen }) => {
               setIsFilesMobileDetailOpen(isDetailOpen);
+            }}
+            rightOverlayView={
+              isAppSettingsOpen ? (
+                <AppSettingsView
+                  onClose={() => setIsAppSettingsOpen(false)}
+                  title="App Settings"
+                />
+              ) : isPreferencesOpen ? (
+                <PreferencesView
+                  onClose={() => setIsPreferencesOpen(false)}
+                  primaryColor={colors.primary}
+                />
+              ) : isThemeSettingsOpen ? (
+                <ThemeSettingsView
+                  onClose={() => setIsThemeSettingsOpen(false)}
+                  appearanceMode={modeContext?.mode || 'system'}
+                  onModeChange={(m) => modeContext?.setMode(m)}
+                  currentColorTheme={colorTheme}
+                  onColorThemeChange={setColorTheme}
+                  onResetTheme={() => {
+                    modeContext?.setMode('light');
+                    resetColorTheme();
+                  }}
+                  availableThemes={colorThemes}
+                />
+              ) : undefined
+            }
+          />
+        </View>
+      ) : mainNavId === 'notification' || mainNavId === 'notifications' || mainNavId === 'bell' ? (
+        /* ──────────────── Notification App View ──────────────── */
+        <View style={{ flex: 1, height: '100%', width: '100%', display: 'flex' as any, flexDirection: 'column' }}>
+          {isMobileOrTablet && !isNotificationDetailOrCompose && (
+            <View
+              style={[
+                styles.userTopBar,
+                { borderBottomColor: colors.border },
+              ]}
+            >
+              <View style={styles.userRow}>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setIsDrawerOpen(true)}
+                  style={[
+                    styles.mobileLogoBadge,
+                    { backgroundColor: colors.primary, shadowColor: colors.primary },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open Navigation Menu"
+                >
+                  <Command size={18} color="#ffffff" strokeWidth={2.4} />
+                </TouchableOpacity>
+                <Text
+                  style={[styles.topBarTitle, { color: colors.foreground, fontSize: 16, fontWeight: '700' }]}
+                >
+                  Notification
+                </Text>
+              </View>
+            </View>
+          )}
+
+          <NotificationsAppView
+            initialTab="Inbox"
+            onOpenDrawer={() => setIsDrawerOpen(true)}
+            onClose={() => setMainNavId('chat')}
+            showMobileHeader={false}
+            onViewStateChange={({ isDetailOpen, isComposing }) => {
+              setIsNotificationDetailOrCompose(isDetailOpen || isComposing);
             }}
             rightOverlayView={
               isAppSettingsOpen ? (

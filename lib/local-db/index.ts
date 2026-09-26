@@ -3,4 +3,5 @@ export * from './sqlite-db';
 export * from './local-email-service';
 export * from './local-file-service';
 export * from './local-chat-service';
+export * from './local-notification-service';
 

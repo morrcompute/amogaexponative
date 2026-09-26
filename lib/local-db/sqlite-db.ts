@@ -954,6 +954,176 @@ async function createTables(db: any) {
     CREATE INDEX IF NOT EXISTS idx_app_contact_supa_uid ON app_contact(supa_auth_uid);
     CREATE INDEX IF NOT EXISTS idx_app_contact_supa_auth_user ON app_contact(supa_auth_user_id);
   `);
+
+  // 11. Create app_notification table
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS app_notification (
+      app_notification_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      app_notification_uuid TEXT UNIQUE,
+      status TEXT DEFAULT 'active',
+      description TEXT,
+      icon TEXT,
+      user_email_account_id TEXT,
+      email_folder_id INTEGER,
+      subject TEXT DEFAULT '(No Subject)',
+      sender_email TEXT,
+      sender_name TEXT,
+      full_name TEXT,
+      sender_mobile TEXT,
+      recipient_mobiles TEXT,
+      cc_emails TEXT,
+      bcc_emails TEXT,
+      body TEXT,
+      is_read INTEGER DEFAULT 0,
+      is_starred INTEGER DEFAULT 0,
+      is_important INTEGER DEFAULT 0,
+      is_draft INTEGER DEFAULT 0,
+      is_deleted INTEGER DEFAULT 0,
+      has_attachments INTEGER DEFAULT 0,
+      ref_email_id INTEGER,
+      ref_email TEXT,
+      for_email_id TEXT,
+      for_email TEXT,
+      ref_sequence_no TEXT,
+      for_sequence_no TEXT,
+      ref_subject TEXT,
+      for_subject TEXT,
+      from_business_number TEXT,
+      from_business_name TEXT,
+      to_business_number TEXT,
+      to_business_name TEXT,
+      for_business_number TEXT,
+      for_business_name TEXT,
+      redirection_icon TEXT,
+      redirection_url TEXT,
+      ref_field_1 TEXT,
+      ref_field_2 TEXT,
+      user_note TEXT,
+      replied_to_email_id TEXT,
+      related_to_email_id TEXT,
+      forwarded_from_email_id TEXT,
+      seen_by_users TEXT,
+      reactions TEXT,
+      sender_display_name TEXT,
+      attachment_url TEXT,
+      attachment_name TEXT,
+      email_opened TEXT,
+      email_open_datetime TEXT,
+      email_open_geo TEXT,
+      custom_one TEXT,
+      custom_two TEXT,
+      custom_three TEXT,
+      meta_fields TEXT,
+      remarks TEXT,
+      store_meta TEXT,
+      workflow_meta TEXT,
+      share_url TEXT,
+      share_status TEXT,
+      business_name TEXT,
+      business_number TEXT,
+      ref_business TEXT,
+      ref_business_number TEXT,
+      ref_user TEXT,
+      ref_appname TEXT,
+      ref_datetime TEXT,
+      social_login_used TEXT,
+      created_user TEXT,
+      created_user_id TEXT,
+      received_datetime TEXT,
+      created_datetime TEXT DEFAULT (datetime('now')),
+      updated_datetime TEXT DEFAULT (datetime('now')),
+      app_name TEXT,
+      is_sync INTEGER DEFAULT 0,
+      ccusers_json TEXT DEFAULT '[]',
+      bccusers_json TEXT DEFAULT '[]',
+      from_email TEXT,
+      to_email TEXT,
+      from_user_name TEXT,
+      to_user_name TEXT,
+      from_mobile TEXT,
+      to_mobile TEXT,
+      from_user_uuid TEXT,
+      to_user_uuid TEXT,
+      from_fullname TEXT,
+      to_fullname TEXT,
+      body_rich_text_json TEXT DEFAULT '{}',
+      email_files_json TEXT DEFAULT '[]',
+      email_content_json TEXT DEFAULT '{}',
+      is_archive INTEGER DEFAULT 0,
+      progress_status TEXT,
+      email_use_timeline TEXT DEFAULT '[]',
+      message_group TEXT,
+      message_type TEXT,
+      message_category TEXT,
+      email_sequence_json TEXT DEFAULT '[]',
+      is_like INTEGER DEFAULT 0,
+      is_dislike INTEGER DEFAULT 0,
+      is_flag INTEGER DEFAULT 0,
+      is_favourite INTEGER DEFAULT 0,
+      email_uuid TEXT,
+      user_uuid TEXT,
+      created_user_uuid TEXT,
+      updated_user_uuid TEXT,
+      user_name TEXT,
+      user_email TEXT,
+      user_mobile TEXT,
+      from_user_email TEXT,
+      from_user_mobile TEXT,
+      to_user_email TEXT,
+      to_user_mobile TEXT,
+      business_uuid TEXT,
+      created_business_uuid TEXT,
+      updated_business_uuid TEXT,
+      for_business_uuid TEXT,
+      ref_business_uuid TEXT,
+      ref_business_name TEXT,
+      from_business_uuid TEXT,
+      from_business_email TEXT,
+      from_business_mobile TEXT,
+      to_business_uuid TEXT,
+      to_business_email TEXT,
+      to_business_mobile TEXT,
+      email_group TEXT,
+      user_id INTEGER,
+      email_connection_json TEXT DEFAULT '{}',
+      email_status_logs_json TEXT DEFAULT '[]',
+      recipient_emails TEXT DEFAULT '[]',
+      status_json TEXT DEFAULT '{}',
+      progress_json TEXT DEFAULT '{}',
+      progress_status_json TEXT DEFAULT '{}',
+      ref_email_uuid TEXT,
+      for_email_uuid TEXT,
+      email_thread_json TEXT DEFAULT '[]',
+      is_actionitem INTEGER DEFAULT 0,
+      is_pin INTEGER DEFAULT 0,
+      email_status TEXT,
+      is_template INTEGER DEFAULT 0,
+      template_name TEXT,
+      folder_name TEXT,
+      is_open INTEGER DEFAULT 0,
+      sent_server_email_uuid TEXT,
+      inbox_server_email_uuid TEXT,
+      sent_imap_id INTEGER,
+      inbox_imap_id INTEGER,
+      sub_folder_name TEXT,
+      month_id INTEGER,
+      month_uuid TEXT,
+      month_name TEXT,
+      financial_year_uuid TEXT,
+      financial_id INTEGER,
+      financial_year TEXT,
+      period_uuid TEXT,
+      period_id INTEGER,
+      period_name TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_app_notification_uuid ON app_notification(app_notification_uuid);
+    CREATE INDEX IF NOT EXISTS idx_app_notification_user ON app_notification(user_uuid);
+    CREATE INDEX IF NOT EXISTS idx_app_notification_email ON app_notification(user_email);
+    CREATE INDEX IF NOT EXISTS idx_app_notification_status ON app_notification(status);
+    CREATE INDEX IF NOT EXISTS idx_app_notification_read ON app_notification(is_read);
+    CREATE INDEX IF NOT EXISTS idx_app_notification_created ON app_notification(created_datetime DESC);
+  `);
 }
 
 function createWebMockDb() {
@@ -1238,6 +1408,43 @@ function createWebMockDb() {
         return { changes: 1, lastInsertRowId: 1 };
       }
 
+      if (q.startsWith('INSERT INTO APP_NOTIFICATION')) {
+        const list = getItem('app_notification');
+        const record: any = {
+          app_notification_id: list.length + 1,
+          app_notification_uuid: params[0] || `notif-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          status: 'active',
+          is_read: 0,
+          created_datetime: new Date().toISOString(),
+          updated_datetime: new Date().toISOString(),
+        };
+        if (params.length > 0 && typeof params[0] === 'object') {
+          Object.assign(record, params[0]);
+        }
+        const filtered = list.filter((n) => n.app_notification_uuid !== record.app_notification_uuid);
+        filtered.unshift(record);
+        setItem('app_notification', filtered);
+        return { changes: 1, lastInsertRowId: record.app_notification_id };
+      }
+
+      if (q.startsWith('UPDATE APP_NOTIFICATION')) {
+        const list = getItem('app_notification');
+        const id = params[params.length - 1];
+        const updated = list.map((n) => (n.app_notification_id === id || n.app_notification_uuid === id ? { ...n, ...params } : n));
+        setItem('app_notification', updated);
+        return { changes: 1 };
+      }
+
+      if (q.startsWith('DELETE FROM APP_NOTIFICATION')) {
+        if (params[0]) {
+          const list = getItem('app_notification');
+          setItem('app_notification', list.filter((n) => n.app_notification_id !== params[0] && n.app_notification_uuid !== params[0] && n.user_uuid !== params[0]));
+        } else {
+          setItem('app_notification', []);
+        }
+        return { changes: 1 };
+      }
+
       if (q.startsWith('DELETE FROM LOCAL_CONVERSATION_MEMBERS')) {
         if (params[0]) {
           const list = getItem('conversation_members');
@@ -1336,6 +1543,14 @@ function createWebMockDb() {
       if (q.includes('APP_CONTACT')) {
         return getItem('app_contact');
       }
+      if (q.includes('APP_NOTIFICATION')) {
+        const list = getItem('app_notification');
+        const userUuid = params[0];
+        if (userUuid) {
+          return list.filter((n) => n.user_uuid === userUuid || n.user_id === userUuid || n.created_user_id === userUuid);
+        }
+        return list;
+      }
       return [];
     },
     getFirstAsync: async (query: string, params: any[] = []) => {
@@ -1384,6 +1599,11 @@ function createWebMockDb() {
         const list = getItem('app_contact');
         const id = params[0];
         return list.find((c) => c.app_contact_id === id || c.contact_uuid === id || c.user_email === id || c.supa_auth_uid === id) || null;
+      }
+      if (q.includes('APP_NOTIFICATION')) {
+        const list = getItem('app_notification');
+        const id = params[0];
+        return list.find((n) => n.app_notification_id === id || n.app_notification_uuid === id) || null;
       }
       return null;
     },

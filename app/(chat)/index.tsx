@@ -58,6 +58,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { ChevronLeft, LogOut, Sun, Moon, X, UserPlus, Menu, Command, MapPin } from 'lucide-react-native';
 import { FilesAppView } from '@/components/files/files-app-view';
+import { NotificationsAppView } from '@/components/notifications/notifications-app-view';
 
 export default function MobileChatScreen() {
   const insets = useSafeAreaInsets();
@@ -118,10 +119,12 @@ export default function MobileChatScreen() {
   const [externalReplyMap, setExternalReplyMap] = useState<Record<string, any>>({});
   const [isEmailDetailOrCompose, setIsEmailDetailOrCompose] = useState(false);
   const [isFilesMobileDetailOpen, setIsFilesMobileDetailOpen] = useState(false);
+  const [isNotificationDetailOrCompose, setIsNotificationDetailOrCompose] = useState(false);
 
   useEffect(() => {
     setIsEmailDetailOrCompose(false);
     setIsFilesMobileDetailOpen(false);
+    setIsNotificationDetailOrCompose(false);
   }, [activeMenuId]);
 
   useEffect(() => {
@@ -1340,6 +1343,47 @@ export default function MobileChatScreen() {
             showMobileHeader={false}
             onViewStateChange={({ isDetailOpen }) => {
               setIsFilesMobileDetailOpen(isDetailOpen);
+            }}
+          />
+        </View>
+      ) : activeMenuId === 'notification' || activeMenuId === 'notifications' || activeMenuId === 'bell' ? (
+        /* ──────────────── Notifications View ──────────────── */
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: colors.background,
+            paddingBottom: insets.bottom,
+            width: '100%',
+          }}
+        >
+          {/* Top Bar with Logo Drawer Button (hidden when mobile detail or compose is open) */}
+          {!isNotificationDetailOrCompose && (
+            <View style={[styles.userTopBar, { borderBottomColor: isDark ? colors.border : '#f1f5f9' }]}>
+              <View style={styles.userBarLeft}>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setIsDrawerOpen(true)}
+                  style={[styles.mobileLogoBadge, { backgroundColor: colors.primary }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open Navigation Menu"
+                >
+                  <Command size={18} color="#ffffff" strokeWidth={2.4} />
+                </TouchableOpacity>
+
+                <Text style={[styles.topBarTitle, { color: colors.foreground, fontSize: 16, fontWeight: '700', fontFamily: 'Open Sans' }]}>
+                  Notification
+                </Text>
+              </View>
+            </View>
+          )}
+
+          <NotificationsAppView
+            initialTab="Inbox"
+            onOpenDrawer={() => setIsDrawerOpen(true)}
+            onClose={() => setActiveMenuId('chat')}
+            showMobileHeader={false}
+            onViewStateChange={({ isDetailOpen, isComposing }) => {
+              setIsNotificationDetailOrCompose(isDetailOpen || isComposing);
             }}
           />
         </View>
