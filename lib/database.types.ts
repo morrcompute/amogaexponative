@@ -323,6 +323,42 @@ export type Database = {
         };
         Relationships: [];
       };
+      user_push_tokens: {
+        Row: {
+          id?: string;
+          user_id: string | null;
+          user_email: string;
+          expo_push_token: string;
+          device_type: string | null;
+          device_name: string | null;
+          is_active: boolean;
+          created_at?: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          user_email?: string;
+          expo_push_token: string;
+          device_type?: string | null;
+          device_name?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          user_email?: string;
+          expo_push_token?: string;
+          device_type?: string | null;
+          device_name?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;

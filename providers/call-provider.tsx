@@ -6,6 +6,7 @@ import { cometchatService } from '../lib/cometchat-service';
 import { requestCallPermissions } from '../lib/call-permissions';
 import { callSoundService } from '../lib/call-sound-service';
 import { logCallMessage } from '../lib/chat-service';
+import { sendCallPushNotification } from '../lib/push-notifications';
 import { IncomingCallModal } from '../components/calling/incoming-call-modal';
 import { ActiveCallModal } from '../components/calling/active-call-modal';
 
@@ -354,6 +355,16 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           }
         });
 
+        // Dispatch Push Notification to target device (wakes lock screen / background)
+        sendCallPushNotification({
+          recipientUserIds: [targetUser.id],
+          callerName: displayName,
+          callerId: user.id,
+          callType: type,
+          sessionId: newSessionId,
+          isGroupCall: false,
+        }).catch((err) => console.warn('[CallProvider] Push notification error:', err));
+
         return true;
       } catch (err) {
         console.error('[CallProvider] Error starting call:', err);
@@ -453,6 +464,19 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
             }
           });
         });
+
+        // Dispatch Push Notification to all group members (wakes lock screen / background)
+        if (memberIds.length > 0) {
+          sendCallPushNotification({
+            recipientUserIds: memberIds,
+            callerName: displayName,
+            callerId: user.id,
+            callType: type,
+            sessionId: newSessionId,
+            isGroupCall: true,
+            groupName: groupName,
+          }).catch((err) => console.warn('[CallProvider] Group call push error:', err));
+        }
 
         // Initiator directly enters active room
         setCallState('active');

@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { sendChatPushNotification } from './push-notifications';
 import type {
   ChatMessage,
   Conversation,
@@ -265,6 +266,45 @@ export async function sendMessage(params: {
       }));
 
       await supabase.from('chat_messages').insert(recipientCopies);
+
+      // 4. Trigger Expo Push Notification to all recipients
+      (async () => {
+        try {
+          // Fetch sender profile name
+          const { data: senderProf } = await supabase
+            .from('profiles')
+            .select('name, email')
+            .eq('id', senderId)
+            .maybeSingle();
+
+          const senderName = senderProf?.name || senderProf?.email?.split('@')[0] || 'User';
+
+          // Fetch conversation to check if group
+          const { data: conv } = await supabase
+            .from('conversations')
+            .select('id, name, type')
+            .eq('id', conversationId)
+            .maybeSingle();
+
+          const isGroup = conv?.type === 'group' || conv?.type === 'channel_group' || conv?.type === 'message_group';
+          const groupName = conv?.name;
+          const recipientUserIds = recipientMembers.map((m) => m.user_id);
+
+          await sendChatPushNotification({
+            recipientUserIds,
+            senderName,
+            senderId,
+            messageText,
+            messageType,
+            fileName,
+            conversationId,
+            isGroup,
+            groupName,
+          });
+        } catch (pushErr) {
+          console.warn('[ChatService] Push notification trigger error:', pushErr);
+        }
+      })();
     }
 
     return senderMessage;
