@@ -27,6 +27,7 @@ web-build/
 *.pem
 *.mobileprovision
 *.orig.*
+*firebase-adminsdk*.json
 
 # Native generated folders
 /ios/

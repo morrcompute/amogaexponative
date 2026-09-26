@@ -19,6 +19,7 @@
     "android": {
       "package": "com.amoga.amogamobiledev1",
       "versionCode": 3,
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#FFFFFF"
