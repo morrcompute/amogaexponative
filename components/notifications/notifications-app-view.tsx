@@ -520,7 +520,14 @@ export function NotificationsAppView({
       const newRecord = await LocalNotificationService.createNotification(payload);
 
       if (newRecord) {
-        setNotifications((prev) => [newRecord, ...prev]);
+        setNotifications((prev) => [
+          newRecord,
+          ...prev.filter(
+            (n) =>
+              (n.app_notification_uuid || String(n.app_notification_id)) !==
+              (newRecord.app_notification_uuid || String(newRecord.app_notification_id))
+          ),
+        ]);
         setSelectedId(newRecord.app_notification_uuid || String(newRecord.app_notification_id));
       }
 
@@ -551,7 +558,14 @@ export function NotificationsAppView({
       const newRecord = await LocalNotificationService.createNotification(payload);
 
       if (newRecord) {
-        setNotifications((prev) => [newRecord, ...prev]);
+        setNotifications((prev) => [
+          newRecord,
+          ...prev.filter(
+            (n) =>
+              (n.app_notification_uuid || String(n.app_notification_id)) !==
+              (newRecord.app_notification_uuid || String(newRecord.app_notification_id))
+          ),
+        ]);
         setSelectedId(newRecord.app_notification_uuid || String(newRecord.app_notification_id));
       }
 

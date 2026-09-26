@@ -323,6 +323,103 @@ function createWebMockDb() {
         return { changes: 1 };
       }
 
+      if (q.startsWith('INSERT INTO APP_NOTIFICATION')) {
+        const list = getItem('app_notifications');
+        const record: any = {
+          app_notification_id: list.length + 1,
+          app_notification_uuid: params[0],
+          status: params[1] || 'sent',
+          user_email_account_id: params[2] || null,
+          subject: params[3] || '(No Subject)',
+          sender_email: params[4] || null,
+          sender_name: params[5] || null,
+          full_name: params[6] || null,
+          sender_mobile: params[7] || null,
+          recipient_mobiles: params[8] || null,
+          cc_emails: params[9] || null,
+          bcc_emails: params[10] || null,
+          body: params[11] || '',
+          is_read: params[12] !== undefined ? (params[12] ? 1 : 0) : 1,
+          is_starred: params[13] !== undefined ? (params[13] ? 1 : 0) : 0,
+          is_important: params[14] !== undefined ? (params[14] ? 1 : 0) : 0,
+          is_draft: params[15] !== undefined ? (params[15] ? 1 : 0) : 0,
+          is_deleted: params[16] !== undefined ? (params[16] ? 1 : 0) : 0,
+          has_attachments: params[17] !== undefined ? (params[17] ? 1 : 0) : 0,
+          created_user: params[18] || null,
+          created_user_id: params[19] || null,
+          received_datetime: params[20] || new Date().toISOString(),
+          created_datetime: params[21] || new Date().toISOString(),
+          updated_datetime: params[22] || new Date().toISOString(),
+          ccusers_json: params[23] || '[]',
+          bccusers_json: params[24] || '[]',
+          from_email: params[25] || null,
+          to_email: params[26] || null,
+          from_user_name: params[27] || null,
+          to_user_name: params[28] || null,
+          from_mobile: params[29] || null,
+          to_mobile: params[30] || null,
+          from_user_uuid: params[31] || null,
+          to_user_uuid: params[32] || null,
+          from_fullname: params[33] || null,
+          to_fullname: params[34] || null,
+          email_files_json: params[35] || '[]',
+          is_archive: params[36] !== undefined ? (params[36] ? 1 : 0) : 0,
+          is_like: params[37] !== undefined ? (params[37] ? 1 : 0) : 0,
+          is_dislike: params[38] !== undefined ? (params[38] ? 1 : 0) : 0,
+          is_flag: params[39] !== undefined ? (params[39] ? 1 : 0) : 0,
+          is_favourite: params[40] !== undefined ? (params[40] ? 1 : 0) : 0,
+          user_uuid: params[41] || null,
+          created_user_uuid: params[42] || null,
+          updated_user_uuid: params[43] || null,
+          user_name: params[44] || null,
+          user_email: params[45] || null,
+          user_mobile: params[46] || null,
+          from_user_email: params[47] || null,
+          from_user_mobile: params[48] || null,
+          to_user_email: params[49] || null,
+          to_user_mobile: params[50] || null,
+          month_name: params[51] || null,
+          folder_name: params[52] || (params[15] ? 'Drafts' : 'Sent'),
+          is_sync: params[53] !== undefined ? (params[53] ? 1 : 0) : 0,
+        };
+        const filtered = list.filter((n: any) => n.app_notification_uuid !== record.app_notification_uuid);
+        filtered.unshift(record);
+        setItem('app_notifications', filtered);
+        return { changes: 1, lastInsertRowId: record.app_notification_id };
+      }
+
+      if (q.startsWith('UPDATE APP_NOTIFICATION')) {
+        const list = getItem('app_notifications');
+        const uuid = params[params.length - 1];
+        if (q.includes('IS_READ')) {
+          const val = params[0];
+          const updated = list.map((n: any) => (n.app_notification_uuid === uuid || n.app_notification_id === uuid ? { ...n, is_read: val ? 1 : 0 } : n));
+          setItem('app_notifications', updated);
+        } else if (q.includes('IS_STARRED')) {
+          const val = params[0];
+          const updated = list.map((n: any) => (n.app_notification_uuid === uuid || n.app_notification_id === uuid ? { ...n, is_starred: val ? 1 : 0, is_important: val ? 1 : 0 } : n));
+          setItem('app_notifications', updated);
+        } else if (q.includes('IS_DELETED')) {
+          const updated = list.map((n: any) => (n.app_notification_uuid === uuid || n.app_notification_id === uuid ? { ...n, is_deleted: 1 } : n));
+          setItem('app_notifications', updated);
+        } else if (q.includes('IS_SYNC')) {
+          const updated = list.map((n: any) => (n.app_notification_uuid === uuid || n.app_notification_id === uuid ? { ...n, is_sync: 1 } : n));
+          setItem('app_notifications', updated);
+        }
+        return { changes: 1 };
+      }
+
+      if (q.startsWith('DELETE FROM APP_NOTIFICATION')) {
+        const id = params[0];
+        if (id) {
+          const list = getItem('app_notifications');
+          setItem('app_notifications', list.filter((n: any) => n.app_notification_uuid !== id && n.app_notification_id !== id));
+        } else {
+          setItem('app_notifications', []);
+        }
+        return { changes: 1 };
+      }
+
       if (q.startsWith('DELETE FROM LOCAL_CONVERSATIONS')) {
         setItem('conversations', []);
         return { changes: 1 };
@@ -391,10 +488,19 @@ function createWebMockDb() {
       if (q.includes('APP_CONTACT')) {
         return getItem('app_contact');
       }
+      if (q.includes('APP_NOTIFICATION')) {
+        const list = getItem('app_notifications');
+        return list.filter((n: any) => !n.is_deleted);
+      }
       return [];
     },
     getFirstAsync: async (query: string, params: any[] = []) => {
       const q = query.trim().toUpperCase();
+      if (q.includes('APP_NOTIFICATION')) {
+        const list = getItem('app_notifications');
+        const id = params[0];
+        return list.find((n: any) => n.app_notification_id === id || n.app_notification_uuid === id) || null;
+      }
       if (q.includes('LOCAL_EMAILS')) {
         const list = getItem('emails');
         const id = params[0];
