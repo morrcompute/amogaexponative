@@ -3,6 +3,30 @@ import { getLocalDatabase } from './sqlite-db';
 import type { AppNotificationRecord } from './types';
 import { supabase } from '@/lib/supabase';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function ensureValidUuid(val?: string | null): string | null {
+  if (!val || typeof val !== 'string') return null;
+  const trimmed = val.trim();
+  return UUID_REGEX.test(trimmed) ? trimmed : null;
+}
+
+function generateV4Uuid(): string {
+  if (typeof Crypto.randomUUID === 'function') {
+    try {
+      const u = Crypto.randomUUID();
+      if (UUID_REGEX.test(u)) {
+        return u;
+      }
+    } catch {}
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export class LocalNotificationService {
   /**
    * Create a new notification and persist it to both Local SQLite and Supabase PostgreSQL.
@@ -13,11 +37,7 @@ export class LocalNotificationService {
     const db = await getLocalDatabase();
     const nowIso = new Date().toISOString();
     const currentMonth = new Date().toLocaleString('en-US', { month: 'long' });
-    const notifUuid =
-      data.app_notification_uuid ||
-      (typeof Crypto.randomUUID === 'function'
-        ? Crypto.randomUUID()
-        : `notif-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
+    const notifUuid = ensureValidUuid(data.app_notification_uuid) || generateV4Uuid();
 
     const record: AppNotificationRecord = {
       app_notification_uuid: notifUuid,
@@ -57,8 +77,8 @@ export class LocalNotificationService {
       to_user_name: data.to_user_name ?? data.to_fullname ?? null,
       from_mobile: data.from_mobile ?? data.sender_mobile ?? null,
       to_mobile: data.to_mobile ?? data.recipient_mobiles ?? null,
-      from_user_uuid: data.from_user_uuid ?? data.user_uuid ?? null,
-      to_user_uuid: data.to_user_uuid ?? null,
+      from_user_uuid: ensureValidUuid(data.from_user_uuid || data.user_uuid),
+      to_user_uuid: ensureValidUuid(data.to_user_uuid),
       from_fullname: data.from_fullname ?? data.full_name ?? data.sender_name ?? null,
       to_fullname: data.to_fullname ?? data.to_user_name ?? null,
       email_files_json:
@@ -74,9 +94,9 @@ export class LocalNotificationService {
       is_dislike: data.is_dislike !== undefined ? (data.is_dislike ? 1 : 0) : 0,
       is_flag: data.is_flag !== undefined ? (data.is_flag ? 1 : 0) : 0,
       is_favourite: data.is_favourite !== undefined ? (data.is_favourite ? 1 : 0) : 0,
-      user_uuid: data.user_uuid ?? null,
-      created_user_uuid: data.created_user_uuid ?? data.user_uuid ?? null,
-      updated_user_uuid: data.updated_user_uuid ?? data.user_uuid ?? null,
+      user_uuid: ensureValidUuid(data.user_uuid),
+      created_user_uuid: ensureValidUuid(data.created_user_uuid || data.user_uuid),
+      updated_user_uuid: ensureValidUuid(data.updated_user_uuid || data.user_uuid),
       user_name: data.user_name ?? data.sender_name ?? null,
       user_email: data.user_email ?? data.sender_email ?? null,
       user_mobile: data.user_mobile ?? data.sender_mobile ?? null,
@@ -193,10 +213,12 @@ export class LocalNotificationService {
       [notifUuid]
     );
 
-    // 3. Background Supabase Sync
-    this.syncToSupabase(record).catch((err) => {
-      console.warn('Background Supabase notification sync notice:', err);
-    });
+    // 3. Supabase Sync
+    try {
+      await this.syncToSupabase(record);
+    } catch (err) {
+      console.warn('Supabase notification sync notice:', err);
+    }
 
     return savedRecord || record;
   }
@@ -206,9 +228,9 @@ export class LocalNotificationService {
    */
   static async syncToSupabase(record: AppNotificationRecord): Promise<boolean> {
     try {
-      const payload = {
-        app_notification_uuid: record.app_notification_uuid,
-        status: record.status,
+      const payload: Record<string, any> = {
+        app_notification_uuid: ensureValidUuid(record.app_notification_uuid) || generateV4Uuid(),
+        status: record.status || 'sent',
         user_email_account_id: record.user_email_account_id,
         subject: record.subject,
         sender_email: record.sender_email,
@@ -230,27 +252,27 @@ export class LocalNotificationService {
         received_datetime: record.received_datetime,
         created_datetime: record.created_datetime,
         updated_datetime: record.updated_datetime,
-        ccusers_json: typeof record.ccusers_json === 'string' ? JSON.parse(record.ccusers_json || '[]') : record.ccusers_json,
-        bccusers_json: typeof record.bccusers_json === 'string' ? JSON.parse(record.bccusers_json || '[]') : record.bccusers_json,
+        ccusers_json: typeof record.ccusers_json === 'string' ? JSON.parse(record.ccusers_json || '[]') : (record.ccusers_json || []),
+        bccusers_json: typeof record.bccusers_json === 'string' ? JSON.parse(record.bccusers_json || '[]') : (record.bccusers_json || []),
         from_email: record.from_email,
         to_email: record.to_email,
         from_user_name: record.from_user_name,
         to_user_name: record.to_user_name,
         from_mobile: record.from_mobile,
         to_mobile: record.to_mobile,
-        from_user_uuid: record.from_user_uuid,
-        to_user_uuid: record.to_user_uuid,
+        from_user_uuid: ensureValidUuid(record.from_user_uuid),
+        to_user_uuid: ensureValidUuid(record.to_user_uuid),
         from_fullname: record.from_fullname,
         to_fullname: record.to_fullname,
-        email_files_json: typeof record.email_files_json === 'string' ? JSON.parse(record.email_files_json || '[]') : record.email_files_json,
+        email_files_json: typeof record.email_files_json === 'string' ? JSON.parse(record.email_files_json || '[]') : (record.email_files_json || []),
         is_archive: Boolean(record.is_archive),
         is_like: Boolean(record.is_like),
         is_dislike: Boolean(record.is_dislike),
         is_flag: Boolean(record.is_flag),
         is_favourite: Boolean(record.is_favourite),
-        user_uuid: record.user_uuid,
-        created_user_uuid: record.created_user_uuid,
-        updated_user_uuid: record.updated_user_uuid,
+        user_uuid: ensureValidUuid(record.user_uuid),
+        created_user_uuid: ensureValidUuid(record.created_user_uuid),
+        updated_user_uuid: ensureValidUuid(record.updated_user_uuid),
         user_name: record.user_name,
         user_email: record.user_email,
         user_mobile: record.user_mobile,
@@ -272,6 +294,8 @@ export class LocalNotificationService {
           [record.app_notification_uuid]
         );
         return true;
+      } else {
+        console.error('Supabase app_notification upsert error:', error);
       }
       return false;
     } catch (err) {
@@ -304,17 +328,25 @@ export class LocalNotificationService {
           .eq('is_deleted', false)
           .order('created_datetime', { ascending: false });
 
-        if (userEmail && userId) {
+        const validUserUuid = ensureValidUuid(userId);
+        const cleanEmail = userEmail?.trim().toLowerCase();
+
+        if (cleanEmail && validUserUuid) {
           query = query.or(
-            `to_email.ilike.%${userEmail}%,to_user_email.ilike.%${userEmail}%,cc_emails.ilike.%${userEmail}%,bcc_emails.ilike.%${userEmail}%,from_email.ilike.%${userEmail}%,sender_email.ilike.%${userEmail}%,created_user_id.eq.${userId},user_uuid.eq.${userId}`
+            `to_email.ilike.%${cleanEmail}%,to_user_email.ilike.%${cleanEmail}%,cc_emails.ilike.%${cleanEmail}%,bcc_emails.ilike.%${cleanEmail}%,from_email.ilike.%${cleanEmail}%,sender_email.ilike.%${cleanEmail}%,created_user_id.eq.${userId},user_uuid.eq.${validUserUuid}`
           );
-        } else if (userEmail) {
+        } else if (cleanEmail) {
           query = query.or(
-            `to_email.ilike.%${userEmail}%,to_user_email.ilike.%${userEmail}%,cc_emails.ilike.%${userEmail}%,bcc_emails.ilike.%${userEmail}%,from_email.ilike.%${userEmail}%,sender_email.ilike.%${userEmail}%`
+            `to_email.ilike.%${cleanEmail}%,to_user_email.ilike.%${cleanEmail}%,cc_emails.ilike.%${cleanEmail}%,bcc_emails.ilike.%${cleanEmail}%,from_email.ilike.%${cleanEmail}%,sender_email.ilike.%${cleanEmail}%`
           );
+        } else if (validUserUuid) {
+          query = query.or(`user_uuid.eq.${validUserUuid},created_user_uuid.eq.${validUserUuid},created_user_id.eq.${userId}`);
         }
 
         const { data: cloudItems, error } = await query.limit(100);
+        if (error) {
+          console.warn('Supabase fetch user notifications notice:', error.message || error);
+        }
 
         if (!error && Array.isArray(cloudItems)) {
           for (const item of cloudItems) {
