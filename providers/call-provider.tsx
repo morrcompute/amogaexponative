@@ -640,7 +640,15 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     // 1. Cold start: notification was tapped while app was completely closed
     Notifications.getLastNotificationResponseAsync().then((response) => {
       if (response?.notification?.request?.content?.data) {
-        handleCallNotificationData(response.notification.request.content.data);
+        const actionId = response.actionIdentifier;
+        if (actionId === 'DECLINE_CALL') {
+          rejectCall();
+        } else {
+          handleCallNotificationData(response.notification.request.content.data);
+          if (actionId === 'ACCEPT_CALL') {
+            setTimeout(() => acceptCall(), 500);
+          }
+        }
       }
     }).catch((err) => {
       console.warn('[CallProvider] Error checking last notification response:', err);
@@ -649,15 +657,23 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     // 2. Background/Foreground: notification was tapped while app was in background
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response?.notification?.request?.content?.data;
+      const actionId = response.actionIdentifier;
       if (data) {
-        handleCallNotificationData(data);
+        if (actionId === 'DECLINE_CALL') {
+          rejectCall();
+        } else {
+          handleCallNotificationData(data);
+          if (actionId === 'ACCEPT_CALL') {
+            setTimeout(() => acceptCall(), 500);
+          }
+        }
       }
     });
 
     return () => {
       subscription.remove();
     };
-  }, []);
+  }, [acceptCall, rejectCall]);
 
   const currentUserMobile =
     profile?.mobile || (user as any)?.phone || user?.user_metadata?.mobile || user?.email?.split('@')[0] || 'user';

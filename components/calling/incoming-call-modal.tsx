@@ -71,43 +71,51 @@ export function IncomingCallModal({
   return (
     <Modal
       visible={visible}
-      transparent
-      animationType="slide"
+      transparent={false}
+      animationType="fade"
+      statusBarTranslucent
       onRequestClose={onReject}
     >
-      <View style={styles.backdrop}>
-        <View style={styles.card}>
+      <View style={styles.fullScreenContainer}>
+        {/* Top Header Section */}
+        <View style={styles.topSection}>
           <View style={styles.badgeRow}>
-            {isGroupCall && <Users size={14} color="#38bdf8" style={{ marginRight: 6 }} />}
+            {isGroupCall && <Users size={16} color="#38bdf8" style={{ marginRight: 8 }} />}
             <Text style={styles.callTypeBadge}>
               {isGroupCall
-                ? (callType === 'video' ? 'Group Video Call' : 'Group Audio Call')
-                : (callType === 'video' ? 'Incoming Video Call' : 'Incoming Audio Call')}
+                ? (callType === 'video' ? 'INCOMING GROUP VIDEO CALL' : 'INCOMING GROUP AUDIO CALL')
+                : (callType === 'video' ? 'INCOMING VIDEO CALL' : 'INCOMING AUDIO CALL')}
             </Text>
           </View>
+        </View>
 
-          {/* Animated Avatar Box */}
+        {/* Center Caller Profile & Pulsing Ring Section */}
+        <View style={styles.centerSection}>
           <Animated.View
             style={[
-              styles.avatarContainer,
+              styles.pulseRingOuter,
               { transform: [{ scale: pulseAnim }] },
-              isGroupCall && styles.groupAvatarContainer,
+              isGroupCall && styles.groupPulseRingOuter,
             ]}
           >
-            <View style={[styles.avatarInner, isGroupCall && styles.groupAvatarInner]}>
-              <Text style={styles.avatarText}>{initials}</Text>
+            <View style={[styles.pulseRingMiddle, isGroupCall && styles.groupPulseRingMiddle]}>
+              <View style={[styles.avatarCircle, isGroupCall && styles.groupAvatarCircle]}>
+                <Text style={styles.avatarText}>{initials}</Text>
+              </View>
             </View>
           </Animated.View>
 
           <Text style={styles.callerName} numberOfLines={1}>
             {displayName}
           </Text>
-          
+
           <Text style={styles.ringingSub}>
             {isGroupCall ? `${callerName || 'Someone'} is inviting you to join` : 'Ringing...'}
           </Text>
+        </View>
 
-          {/* Action Buttons: Decline (Red) and Accept (Green) */}
+        {/* Bottom Actions Section: Decline (Red) and Accept (Green) */}
+        <View style={styles.bottomSection}>
           <View style={styles.actionsRow}>
             {/* Decline Button */}
             <View style={styles.actionCol}>
@@ -118,7 +126,7 @@ export function IncomingCallModal({
                 accessibilityRole="button"
                 accessibilityLabel="Decline Call"
               >
-                <PhoneOff size={28} color="#ffffff" />
+                <PhoneOff size={32} color="#ffffff" />
               </TouchableOpacity>
               <Text style={styles.btnLabel}>Decline</Text>
             </View>
@@ -133,12 +141,12 @@ export function IncomingCallModal({
                 accessibilityLabel="Accept Call"
               >
                 {callType === 'video' ? (
-                  <Video size={28} color="#ffffff" />
+                  <Video size={32} color="#ffffff" />
                 ) : (
-                  <Phone size={28} color="#ffffff" />
+                  <Phone size={32} color="#ffffff" />
                 )}
               </TouchableOpacity>
-              <Text style={styles.btnLabel}>{isGroupCall ? 'Join' : 'Accept'}</Text>
+              <Text style={styles.btnLabel}>{isGroupCall ? 'Join Call' : 'Accept'}</Text>
             </View>
           </View>
         </View>
@@ -148,118 +156,124 @@ export function IncomingCallModal({
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
+  fullScreenContainer: {
     flex: 1,
-    backgroundColor: 'rgba(10, 15, 29, 0.90)',
-    justifyContent: 'center',
+    backgroundColor: '#0a0e1a',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 24,
-    zIndex: 999999,
-    ...(Platform.OS === 'web'
-      ? ({
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-        } as any)
-      : {}),
-  },
-  card: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#0f172a',
-    borderRadius: 28,
-    paddingVertical: 36,
+    paddingVertical: Platform.OS === 'ios' ? 60 : 48,
     paddingHorizontal: 24,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.5,
-    shadowRadius: 24,
-    elevation: 20,
+    zIndex: 999999,
   },
-  callTypeBadge: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#94a3b8',
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
+  topSection: {
+    alignItems: 'center',
+    paddingTop: 16,
   },
   badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    justifyContent: 'center',
   },
-  avatarContainer: {
-    width: 104,
-    height: 104,
-    borderRadius: 52,
-    backgroundColor: 'rgba(99, 102, 241, 0.25)',
+  callTypeBadge: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#94a3b8',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+  },
+  centerSection: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  pulseRingOuter: {
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    backgroundColor: 'rgba(99, 102, 241, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(99, 102, 241, 0.5)',
-    marginBottom: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(99, 102, 241, 0.3)',
+    marginBottom: 32,
   },
-  groupAvatarContainer: {
-    backgroundColor: 'rgba(56, 189, 248, 0.25)',
-    borderColor: 'rgba(56, 189, 248, 0.5)',
+  groupPulseRingOuter: {
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    borderColor: 'rgba(56, 189, 248, 0.3)',
   },
-  avatarInner: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: '#4f46e5',
+  pulseRingMiddle: {
+    width: 144,
+    height: 144,
+    borderRadius: 72,
+    backgroundColor: 'rgba(99, 102, 241, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  groupAvatarInner: {
+  groupPulseRingMiddle: {
+    backgroundColor: 'rgba(56, 189, 248, 0.3)',
+  },
+  avatarCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#6366f1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  groupAvatarCircle: {
     backgroundColor: '#0284c7',
+    shadowColor: '#0284c7',
   },
   avatarText: {
-    fontSize: 32,
-    fontWeight: '700',
+    fontSize: 44,
+    fontWeight: '800',
     color: '#ffffff',
   },
   callerName: {
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 30,
+    fontWeight: '800',
     color: '#ffffff',
     textAlign: 'center',
-    marginBottom: 6,
+    marginBottom: 10,
+    paddingHorizontal: 20,
   },
   ringingSub: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#38bdf8',
-    fontWeight: '500',
-    marginBottom: 36,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  bottomSection: {
+    width: '100%',
+    paddingBottom: 24,
   },
   actionsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
+    alignItems: 'center',
     width: '100%',
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
   },
   actionCol: {
     alignItems: 'center',
   },
   callBtn: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 8,
-    marginBottom: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 12,
+    marginBottom: 12,
   },
   declineBtn: {
     backgroundColor: '#ef4444',
@@ -268,7 +282,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#10b981',
   },
   btnLabel: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#cbd5e1',
     fontWeight: '600',
   },

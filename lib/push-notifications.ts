@@ -66,6 +66,25 @@ export async function registerForPushNotificationsAsync(
         enableVibrate: true,
         showBadge: true,
       });
+
+      // Notification Category with direct Accept / Decline interactive buttons
+      await Notifications.setNotificationCategoryAsync('call-incoming', [
+        {
+          identifier: 'ACCEPT_CALL',
+          buttonTitle: 'Accept 📞',
+          options: {
+            opensAppToForeground: true,
+          },
+        },
+        {
+          identifier: 'DECLINE_CALL',
+          buttonTitle: 'Decline ❌',
+          options: {
+            opensAppToForeground: false,
+            isDestructive: true,
+          },
+        },
+      ]);
     }
 
     // 2. Check physical device
@@ -430,6 +449,7 @@ export async function sendCallPushNotification(params: {
         group_name: groupName,
       },
       channelId: 'incoming-calls',
+      categoryIdentifier: 'call-incoming',
       priority: 'high',
       badge: 1,
     }));
