@@ -148,7 +148,7 @@ export async function sendExpoPushNotification(params: {
 
     // 3. Build Expo push messages payload
     const messages = tokenRecords
-      .filter((rec) => Boolean(rec.expo_push_token && Notifications.isDevicePushToken(rec.expo_push_token) === false ? true : true))
+      .filter((rec) => Boolean(rec.expo_push_token && typeof rec.expo_push_token === 'string'))
       .map((rec) => ({
         to: rec.expo_push_token,
         sound: 'default',
