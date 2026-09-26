@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './auth-provider';
 import { cometchatService } from '../lib/cometchat-service';
@@ -602,6 +603,61 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       supabase.removeChannel(myChannel);
     };
   }, [user?.id, callState, callToken, resetCallState]);
+
+  // Listen for user tapping on incoming call push notifications (Lock Screen & Background)
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    const handleCallNotificationData = (data: any) => {
+      if (data && data.type === 'incoming_call' && data.session_id) {
+        console.log('[CallProvider] Triggering incoming call modal from notification:', data);
+        setSessionId(data.session_id);
+        setCallType(data.call_type || 'audio');
+        setIsGroupCall(Boolean(data.is_group_call));
+        if (data.is_group_call) {
+          setGroupInfo({
+            id: data.group_id || data.conversation_id || '',
+            name: data.group_name || 'Group Chat',
+          });
+          setPartnerInfo({
+            id: data.caller_id || '',
+            name: data.caller_name || 'Group Member',
+          });
+        } else {
+          setGroupInfo(null);
+          setPartnerInfo({
+            id: data.caller_id || '',
+            name: data.caller_name || 'Incoming Call',
+          });
+        }
+        isCallerRef.current = false;
+        callStartTimeRef.current = null;
+        setCallState('incoming');
+        callSoundService.playIncomingTone();
+      }
+    };
+
+    // 1. Cold start: notification was tapped while app was completely closed
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response?.notification?.request?.content?.data) {
+        handleCallNotificationData(response.notification.request.content.data);
+      }
+    }).catch((err) => {
+      console.warn('[CallProvider] Error checking last notification response:', err);
+    });
+
+    // 2. Background/Foreground: notification was tapped while app was in background
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response?.notification?.request?.content?.data;
+      if (data) {
+        handleCallNotificationData(data);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   const currentUserMobile =
     profile?.mobile || (user as any)?.phone || user?.user_metadata?.mobile || user?.email?.split('@')[0] || 'user';
