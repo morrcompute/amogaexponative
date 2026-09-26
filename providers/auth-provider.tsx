@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/lib/database.types';
 import { LocalChatService, saveLocalProfile, getLocalProfile } from '@/lib/local-db';
 import { cometchatService } from '@/lib/cometchat-service';
+import { registerForPushNotificationsAsync } from '@/lib/push-notifications';
 
 interface AuthContextType {
   /** `null` once resolved and signed out; the session while signed in. */
@@ -125,6 +126,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!userId) return;
     loadProfile(userId, session?.user);
+    if (session?.user?.email) {
+      registerForPushNotificationsAsync(session.user.email, userId).catch((err) => {
+        console.warn('Push registration notice:', err);
+      });
+    }
   }, [userId, session?.user, loadProfile]);
 
   useEffect(() => {

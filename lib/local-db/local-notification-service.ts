@@ -2,6 +2,7 @@ import * as Crypto from 'expo-crypto';
 import { getLocalDatabase } from './sqlite-db';
 import type { AppNotificationRecord } from './types';
 import { supabase } from '@/lib/supabase';
+import { sendExpoPushNotification } from '@/lib/push-notifications';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -218,6 +219,39 @@ export class LocalNotificationService {
       await this.syncToSupabase(record);
     } catch (err) {
       console.warn('Supabase notification sync notice:', err);
+    }
+
+    // 4. Send Real-time Expo Push Notification to all recipients
+    if (!record.is_draft && record.status !== 'draft') {
+      const recipientList: string[] = [];
+      if (record.to_email) recipientList.push(record.to_email);
+      if (record.to_user_email && !recipientList.includes(record.to_user_email)) recipientList.push(record.to_user_email);
+      if (record.cc_emails) {
+        record.cc_emails.split(',').forEach((e) => {
+          const t = e.trim();
+          if (t && !recipientList.includes(t)) recipientList.push(t);
+        });
+      }
+      if (record.bcc_emails) {
+        record.bcc_emails.split(',').forEach((e) => {
+          const t = e.trim();
+          if (t && !recipientList.includes(t)) recipientList.push(t);
+        });
+      }
+
+      if (recipientList.length > 0) {
+        sendExpoPushNotification({
+          recipientEmails: recipientList,
+          senderName: record.sender_name || record.from_fullname || record.from_user_name || undefined,
+          senderEmail: record.sender_email || record.from_email || undefined,
+          subject: record.subject || '(No Subject)',
+          bodyPreview: record.body || '',
+          notificationId: savedRecord?.app_notification_id,
+          notificationUuid: notifUuid,
+        }).catch((err) => {
+          console.warn('Expo push notification trigger notice:', err);
+        });
+      }
     }
 
     return savedRecord || record;
