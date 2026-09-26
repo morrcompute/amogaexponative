@@ -256,6 +256,82 @@ function InCallChatSidebar({
   );
 }
 
+// ── Isolated Native Video Surface Container (Prevents Re-render Flickering on Android) ──
+const NativeVideoCallView = React.memo(
+  ({ callToken, sessionSettings }: { callToken: string; sessionSettings: any }) => {
+    const CometChatComponent = cometchatService.getSDK()?.Component;
+    if (!CometChatComponent) return null;
+
+    return (
+      <View
+        style={styles.nativeVideoSurfaceWrapper}
+        collapsable={false}
+        renderToHardwareTextureAndroid={true}
+      >
+        <CometChatComponent
+          callToken={callToken}
+          sessionSettings={sessionSettings}
+          callSettings={sessionSettings}
+        />
+      </View>
+    );
+  },
+  (prev, next) => prev.callToken === next.callToken
+);
+
+// ── Isolated Call Duration Timer (Keeps ActiveCallModal Stable without 1s Re-render Cycles) ──
+const CallDurationBadge = React.memo(
+  ({
+    visible,
+    callState,
+    isGroupCall,
+    groupName,
+    participantCount,
+  }: {
+    visible: boolean;
+    callState: string;
+    isGroupCall?: boolean;
+    groupName?: string;
+    participantCount?: number;
+  }) => {
+    const [seconds, setSeconds] = useState(0);
+
+    useEffect(() => {
+      if (!visible || callState !== 'active') {
+        setSeconds(0);
+        return;
+      }
+      const interval = setInterval(() => {
+        setSeconds((s) => s + 1);
+      }, 1000);
+      return () => clearInterval(interval);
+    }, [visible, callState]);
+
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    const timeStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+    if (isGroupCall) {
+      return (
+        <View style={styles.nativeGroupBadge}>
+          <View style={styles.timerLiveDot} />
+          <Users size={13} color="#38bdf8" style={{ marginRight: 5 }} />
+          <Text style={styles.nativeGroupBadgeText} numberOfLines={1}>
+            {groupName || 'Group Call'}{participantCount ? ` (${participantCount})` : ''} • {timeStr}
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.nativeTimerBadge}>
+        <View style={styles.timerLiveDot} />
+        <Text style={styles.nativeTimerText}>{timeStr}</Text>
+      </View>
+    );
+  }
+);
+
 export function ActiveCallModal({
   visible,
   callState,
@@ -467,7 +543,7 @@ export function ActiveCallModal({
           } catch (_) {}
         });
       } catch (_) {}
-      localWebStreamRef.current = null;
+        localWebStreamRef.current = null;
     }
   }, []);
 
@@ -509,7 +585,12 @@ export function ActiveCallModal({
     onEndCall();
   }, [stopScreenShare, stopWebMedia, onEndCall]);
 
-  // Memoize sessionSettings — configured for Desktop Web & Mobile APK
+  const handleEndCallRef = useRef(handleEndCall);
+  useEffect(() => {
+    handleEndCallRef.current = handleEndCall;
+  }, [handleEndCall]);
+
+  // Memoize sessionSettings — strictly stable for Native React Native to prevent SurfaceView recreation
   const sessionSettings = useMemo(() => {
     const sdk = cometchatService.getSDK();
 
@@ -539,21 +620,21 @@ export function ActiveCallModal({
           const listener = new sdk.OngoingCallListener({
             onCallEndButtonPressed: () => {
               console.log('[NativeCall] onCallEndButtonPressed fired');
-              handleEndCall();
+              handleEndCallRef.current?.();
             },
             onCallEnded: () => {
               console.log('[NativeCall] onCallEnded fired');
-              handleEndCall();
+              handleEndCallRef.current?.();
             },
             onUserLeft: (u: any) => {
               console.log('[NativeCall] onUserLeft fired:', u);
               if (!isGroupCall) {
-                handleEndCall();
+                handleEndCallRef.current?.();
               }
             },
             onSessionTimeout: () => {
               console.log('[NativeCall] onSessionTimeout fired');
-              handleEndCall();
+              handleEndCallRef.current?.();
             },
             onError: (e: any) => {
               console.warn('[NativeCall] Call error:', e);
@@ -898,21 +979,15 @@ export function ActiveCallModal({
     };
   }, [visible, callState, handleEndCall]);
 
-  // Duration timer & cleanup during active call
+  // Cleanup media during active call transition
   useEffect(() => {
     if (!visible || callState !== 'active') {
-      setCallDuration(0);
       stopScreenShare();
       stopWebMedia();
       return;
     }
 
-    const interval = setInterval(() => {
-      setCallDuration((prev) => prev + 1);
-    }, 1000);
-
     return () => {
-      clearInterval(interval);
       stopScreenShare();
       stopWebMedia();
     };
@@ -1178,10 +1253,9 @@ export function ActiveCallModal({
                     },
                   })
                 ) : (
-                  <CometChatComponent
+                  <NativeVideoCallView
                     callToken={callToken}
                     sessionSettings={sessionSettings}
-                    callSettings={sessionSettings}
                   />
                 )}
 
@@ -1194,21 +1268,14 @@ export function ActiveCallModal({
                     { top: topInset + 10 },
                   ]}
                 >
-                  {/* Left: Call Timer or Group Badge */}
-                  {isGroupCall ? (
-                    <View style={styles.nativeGroupBadge}>
-                      <View style={styles.timerLiveDot} />
-                      <Users size={13} color="#38bdf8" style={{ marginRight: 5 }} />
-                      <Text style={styles.nativeGroupBadgeText} numberOfLines={1}>
-                        {groupName || 'Group Call'}{participantCount ? ` (${participantCount})` : ''} • {formatDuration(callDuration)}
-                      </Text>
-                    </View>
-                  ) : (
-                    <View style={styles.nativeTimerBadge}>
-                      <View style={styles.timerLiveDot} />
-                      <Text style={styles.nativeTimerText}>{formatDuration(callDuration)}</Text>
-                    </View>
-                  )}
+                  {/* Left: Call Timer or Group Badge (Isolated to prevent video blinking) */}
+                  <CallDurationBadge
+                    visible={visible}
+                    callState={callState}
+                    isGroupCall={isGroupCall}
+                    groupName={groupName}
+                    participantCount={participantCount}
+                  />
 
                   {/* Mobile Only: Control Icons in a single, neat horizontal row */}
                   {isMobile && (
@@ -1849,6 +1916,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
     position: 'relative',
     overflow: 'hidden',
+  },
+  nativeVideoSurfaceWrapper: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000000',
+    zIndex: 0,
   },
   fallbackContainer: {
     flex: 1,

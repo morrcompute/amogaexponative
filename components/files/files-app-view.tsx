@@ -1124,20 +1124,6 @@ export function FilesAppView({
                 ]}
               >
                 <View style={styles.rightHeaderLeft}>
-                  {!isDesktop && (
-                    <TouchableOpacity
-                      onPress={() => {
-                        setIsMobileDetailOpen(false);
-                        onViewStateChange?.({ isDetailOpen: false, isUploading: isUploadModalOpen });
-                      }}
-                      style={styles.backBtn}
-                      accessibilityRole="button"
-                      accessibilityLabel="Back to Folders"
-                    >
-                      <ChevronLeft size={22} color={textMain} />
-                    </TouchableOpacity>
-                  )}
-
                   {/* Big Purple Folder Icon Box */}
                   <View style={styles.folderIconBox}>
                     <Folder size={18} color={primaryPurple} />
@@ -1188,21 +1174,23 @@ export function FilesAppView({
                     </>
                   )}
 
-                  {/* Cross [X] ALWAYS ON FAR RIGHT */}
+                  {/* Normal Cross [X] without circular background */}
                   <TouchableOpacity
                     onPress={() => {
                       if (!isDesktop && isMobileDetailOpen) {
                         setIsMobileDetailOpen(false);
                         onViewStateChange?.({ isDetailOpen: false, isUploading: isUploadModalOpen });
-                      } else if (onClose || onCloseRightPane) {
+                      }
+                      if (onClose || onCloseRightPane) {
                         (onClose || onCloseRightPane)?.();
                       }
                     }}
-                    style={[styles.closeCrossBtn, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}
+                    style={styles.closeCrossBtn}
                     accessibilityRole="button"
-                    accessibilityLabel="Close"
+                    accessibilityLabel="Close Files"
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <X size={16} color={textMain} strokeWidth={2.2} />
+                    <X size={20} color={textMain} strokeWidth={2.2} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1458,11 +1446,12 @@ export function FilesAppView({
               {/* Cross on right */}
               <TouchableOpacity
                 onPress={() => setPreviewModalFile(null)}
-                style={[styles.modalCloseBtn, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}
+                style={styles.closeCrossBtn}
                 accessibilityRole="button"
                 accessibilityLabel="Close Preview"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <X size={18} color={textMain} strokeWidth={2.4} />
+                <X size={20} color={textMain} strokeWidth={2.2} />
               </TouchableOpacity>
             </View>
 
@@ -1974,9 +1963,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   closeCrossBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    padding: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
