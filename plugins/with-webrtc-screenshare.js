@@ -93,7 +93,7 @@ function withWebRTCScreenShare(config) {
     return config;
   });
 
-  // 2. MainActivity modifications: enable MediaProjectionService, turn on screen when locked, and PiP handler
+  // 2. MainActivity modifications: enable MediaProjectionService and trigger PiP ONLY when screen sharing is active
   config = withMainActivity(config, (config) => {
     let content = config.modResults.contents;
     const isKotlin = config.modResults.language === 'kt';
@@ -102,13 +102,13 @@ function withWebRTCScreenShare(config) {
       if (!content.includes('com.oney.WebRTCModule.WebRTCModuleOptions')) {
         content = content.replace(
           /package [\w.]+/,
-          (match) => `${match}\n\nimport com.oney.WebRTCModule.WebRTCModuleOptions\nimport com.oney.WebRTCModule.MediaProjectionService\nimport android.os.Build\nimport android.view.WindowManager`
+          (match) => `${match}\n\nimport com.oney.WebRTCModule.WebRTCModuleOptions\nimport com.oney.WebRTCModule.MediaProjectionService`
         );
       }
       if (!content.includes('enableMediaProjectionService = true')) {
         content = content.replace(
           /super\.onCreate\((.*)\)/,
-          (match) => `WebRTCModuleOptions.getInstance().enableMediaProjectionService = true\n    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {\n      setShowWhenLocked(true)\n      setTurnScreenOn(true)\n    } else {\n      window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)\n    }\n    ${match}`
+          (match) => `WebRTCModuleOptions.getInstance().enableMediaProjectionService = true\n    ${match}`
         );
       }
       if (!content.includes('onUserLeaveHint()')) {
@@ -121,13 +121,13 @@ function withWebRTCScreenShare(config) {
       if (!content.includes('com.oney.WebRTCModule.WebRTCModuleOptions')) {
         content = content.replace(
           /package [\w.]+;/,
-          (match) => `${match}\n\nimport com.oney.WebRTCModule.WebRTCModuleOptions;\nimport com.oney.WebRTCModule.MediaProjectionService;\nimport android.os.Build;\nimport android.view.WindowManager;`
+          (match) => `${match}\n\nimport com.oney.WebRTCModule.WebRTCModuleOptions;\nimport com.oney.WebRTCModule.MediaProjectionService;`
         );
       }
       if (!content.includes('enableMediaProjectionService = true')) {
         content = content.replace(
           /super\.onCreate\((.*)\);/,
-          (match) => `WebRTCModuleOptions.getInstance().enableMediaProjectionService = true;\n    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {\n      setShowWhenLocked(true);\n      setTurnScreenOn(true);\n    } else {\n      getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);\n    }\n    ${match}`
+          (match) => `WebRTCModuleOptions.getInstance().enableMediaProjectionService = true;\n    ${match}`
         );
       }
       if (!content.includes('onUserLeaveHint()')) {
