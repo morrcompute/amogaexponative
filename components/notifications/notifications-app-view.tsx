@@ -44,7 +44,7 @@ import {
   DocumentPreviewModal,
   downloadOrShareFile,
   type PreviewableFile,
-} from 'amogamobileds-v1';
+} from '@/components/ui/document-preview-modal';
 
 export type NotificationTabType = 'Inbox' | 'Sent' | 'Folder' | 'Contact';
 

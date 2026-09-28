@@ -49,7 +49,8 @@ import {
   Flag,
   MoreVertical,
 } from 'lucide-react-native';
-import { useTheme, downloadOrShareFile, getDocumentViewerUrl } from 'amogamobileds-v1';
+import { useTheme } from '@/providers/theme-provider';
+import { downloadOrShareFile, getDocumentViewerUrl } from '@/components/ui/document-preview-modal';
 import { useAuth } from '@/providers/auth-provider';
 import { supabase } from '@/lib/supabase';
 

@@ -25,12 +25,17 @@ loadEnv('.env');
 loadEnv('.env.local');
 
 
-const APP_ID = process.env.EXPO_PUBLIC_COMETCHAT_APP_ID || '16836945a87e18e94';
-const REGION = process.env.EXPO_PUBLIC_COMETCHAT_REGION || 'in';
+const APP_ID = process.env.EXPO_PUBLIC_COMETCHAT_APP_ID || process.env.COMETCHAT_APP_ID;
+const REGION = process.env.EXPO_PUBLIC_COMETCHAT_REGION || process.env.COMETCHAT_REGION || 'in';
 const REST_API_KEY =
   process.env.EXPO_PUBLIC_COMETCHAT_REST_API_KEY ||
   process.env.COMETCHAT_REST_API_KEY ||
   process.env.EXPO_PUBLIC_COMETCHAT_AUTH_KEY;
+
+if (!APP_ID || !REST_API_KEY) {
+  console.error('❌ Missing EXPO_PUBLIC_COMETCHAT_APP_ID or EXPO_PUBLIC_COMETCHAT_REST_API_KEY in .env');
+  process.exit(1);
+}
 
 console.log('----------------------------------------------------');
 console.log('🧪 COMETCHAT CALLING INFRASTRUCTURE VERIFICATION TEST');

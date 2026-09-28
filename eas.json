@@ -7,30 +7,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "channel": "development",
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://nvxcqbisyeldjceouggb.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_f7pb9k7U2jT9GgyO4GC2rg_guymXYhK",
-        "EXPO_PUBLIC_API_URL": "https://amoganativenew.vercel.app",
-        "EXPO_PUBLIC_BACKEND_URL": "https://amoganativenew.vercel.app",
-        "EXPO_PUBLIC_MAIL_USER": "ask@morrai.com",
-        "EXPO_PUBLIC_MAIL_PASS": "0un:ZX3JOs&E",
-        "EXPO_PUBLIC_SMTP_HOST": "smtp.hostinger.com",
-        "EXPO_PUBLIC_SMTP_PORT": "587",
-        "EXPO_PUBLIC_SMTP_USER": "ask@morrai.com",
-        "EXPO_PUBLIC_SMTP_PASS": "0un:ZX3JOs&E",
-        "EXPO_PUBLIC_SMTP_SECURE": "false",
-        "EXPO_PUBLIC_SMTP_REQUIRE_TLS": "true",
-        "EXPO_PUBLIC_IMAP_HOST": "imap.hostinger.com",
-        "EXPO_PUBLIC_IMAP_PORT": "993",
-        "EXPO_PUBLIC_IMAP_USER": "ask@morrai.com",
-        "EXPO_PUBLIC_IMAP_PASS": "0un:ZX3JOs&E",
-        "EXPO_PUBLIC_IMAP_SECURE": "true",
-        "EXPO_PUBLIC_COMETCHAT_APP_ID": "16836945a87e18e94",
-        "EXPO_PUBLIC_COMETCHAT_REGION": "IN",
-        "EXPO_PUBLIC_COMETCHAT_AUTH_KEY": "3bcd11bec07aad2099c398f67fa82393ded20593",
-        "EXPO_PUBLIC_COMETCHAT_REST_API_KEY": "b9d95bcebc4d19aa12882cf7e82bfca5140ef25a"
-      }
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
@@ -44,29 +21,6 @@
       },
       "ios": {
         "simulator": true
-      },
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://nvxcqbisyeldjceouggb.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_f7pb9k7U2jT9GgyO4GC2rg_guymXYhK",
-        "EXPO_PUBLIC_API_URL": "https://amoganativenew.vercel.app",
-        "EXPO_PUBLIC_BACKEND_URL": "https://amoganativenew.vercel.app",
-        "EXPO_PUBLIC_MAIL_USER": "ask@morrai.com",
-        "EXPO_PUBLIC_MAIL_PASS": "0un:ZX3JOs&E",
-        "EXPO_PUBLIC_SMTP_HOST": "smtp.hostinger.com",
-        "EXPO_PUBLIC_SMTP_PORT": "587",
-        "EXPO_PUBLIC_SMTP_USER": "ask@morrai.com",
-        "EXPO_PUBLIC_SMTP_PASS": "0un:ZX3JOs&E",
-        "EXPO_PUBLIC_SMTP_SECURE": "false",
-        "EXPO_PUBLIC_SMTP_REQUIRE_TLS": "true",
-        "EXPO_PUBLIC_IMAP_HOST": "imap.hostinger.com",
-        "EXPO_PUBLIC_IMAP_PORT": "993",
-        "EXPO_PUBLIC_IMAP_USER": "ask@morrai.com",
-        "EXPO_PUBLIC_IMAP_PASS": "0un:ZX3JOs&E",
-        "EXPO_PUBLIC_IMAP_SECURE": "true",
-        "EXPO_PUBLIC_COMETCHAT_APP_ID": "16836945a87e18e94",
-        "EXPO_PUBLIC_COMETCHAT_REGION": "IN",
-        "EXPO_PUBLIC_COMETCHAT_AUTH_KEY": "3bcd11bec07aad2099c398f67fa82393ded20593",
-        "EXPO_PUBLIC_COMETCHAT_REST_API_KEY": "b9d95bcebc4d19aa12882cf7e82bfca5140ef25a"
       }
     },
     "apk:arm64": {
@@ -78,29 +32,6 @@
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease -PreactNativeArchitectures=arm64-v8a --parallel --build-cache -x lint -x test -Dorg.gradle.parallel=true -Dorg.gradle.caching=true"
-      },
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://nvxcqbisyeldjceouggb.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_f7pb9k7U2jT9GgyO4GC2rg_guymXYhK",
-        "EXPO_PUBLIC_API_URL": "https://amoganativenew.vercel.app",
-        "EXPO_PUBLIC_BACKEND_URL": "https://amoganativenew.vercel.app",
-        "EXPO_PUBLIC_MAIL_USER": "ask@morrai.com",
-        "EXPO_PUBLIC_MAIL_PASS": "0un:ZX3JOs&E",
-        "EXPO_PUBLIC_SMTP_HOST": "smtp.hostinger.com",
-        "EXPO_PUBLIC_SMTP_PORT": "587",
-        "EXPO_PUBLIC_SMTP_USER": "ask@morrai.com",
-        "EXPO_PUBLIC_SMTP_PASS": "0un:ZX3JOs&E",
-        "EXPO_PUBLIC_SMTP_SECURE": "false",
-        "EXPO_PUBLIC_SMTP_REQUIRE_TLS": "true",
-        "EXPO_PUBLIC_IMAP_HOST": "imap.hostinger.com",
-        "EXPO_PUBLIC_IMAP_PORT": "993",
-        "EXPO_PUBLIC_IMAP_USER": "ask@morrai.com",
-        "EXPO_PUBLIC_IMAP_PASS": "0un:ZX3JOs&E",
-        "EXPO_PUBLIC_IMAP_SECURE": "true",
-        "EXPO_PUBLIC_COMETCHAT_APP_ID": "16836945a87e18e94",
-        "EXPO_PUBLIC_COMETCHAT_REGION": "IN",
-        "EXPO_PUBLIC_COMETCHAT_AUTH_KEY": "3bcd11bec07aad2099c398f67fa82393ded20593",
-        "EXPO_PUBLIC_COMETCHAT_REST_API_KEY": "b9d95bcebc4d19aa12882cf7e82bfca5140ef25a"
       }
     },
     "apk:universal": {
@@ -108,29 +39,6 @@
       "channel": "preview",
       "android": {
         "buildType": "apk"
-      },
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://nvxcqbisyeldjceouggb.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_f7pb9k7U2jT9GgyO4GC2rg_guymXYhK",
-        "EXPO_PUBLIC_API_URL": "https://amoganativenew.vercel.app",
-        "EXPO_PUBLIC_BACKEND_URL": "https://amoganativenew.vercel.app",
-        "EXPO_PUBLIC_MAIL_USER": "ask@morrai.com",
-        "EXPO_PUBLIC_MAIL_PASS": "0un:ZX3JOs&E",
-        "EXPO_PUBLIC_SMTP_HOST": "smtp.hostinger.com",
-        "EXPO_PUBLIC_SMTP_PORT": "587",
-        "EXPO_PUBLIC_SMTP_USER": "ask@morrai.com",
-        "EXPO_PUBLIC_SMTP_PASS": "0un:ZX3JOs&E",
-        "EXPO_PUBLIC_SMTP_SECURE": "false",
-        "EXPO_PUBLIC_SMTP_REQUIRE_TLS": "true",
-        "EXPO_PUBLIC_IMAP_HOST": "imap.hostinger.com",
-        "EXPO_PUBLIC_IMAP_PORT": "993",
-        "EXPO_PUBLIC_IMAP_USER": "ask@morrai.com",
-        "EXPO_PUBLIC_IMAP_PASS": "0un:ZX3JOs&E",
-        "EXPO_PUBLIC_IMAP_SECURE": "true",
-        "EXPO_PUBLIC_COMETCHAT_APP_ID": "16836945a87e18e94",
-        "EXPO_PUBLIC_COMETCHAT_REGION": "IN",
-        "EXPO_PUBLIC_COMETCHAT_AUTH_KEY": "3bcd11bec07aad2099c398f67fa82393ded20593",
-        "EXPO_PUBLIC_COMETCHAT_REST_API_KEY": "b9d95bcebc4d19aa12882cf7e82bfca5140ef25a"
       }
     },
     "production": {
@@ -138,29 +46,6 @@
       "channel": "production",
       "android": {
         "buildType": "app-bundle"
-      },
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://nvxcqbisyeldjceouggb.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_f7pb9k7U2jT9GgyO4GC2rg_guymXYhK",
-        "EXPO_PUBLIC_API_URL": "https://amoganativenew.vercel.app",
-        "EXPO_PUBLIC_BACKEND_URL": "https://amoganativenew.vercel.app",
-        "EXPO_PUBLIC_MAIL_USER": "ask@morrai.com",
-        "EXPO_PUBLIC_MAIL_PASS": "0un:ZX3JOs&E",
-        "EXPO_PUBLIC_SMTP_HOST": "smtp.hostinger.com",
-        "EXPO_PUBLIC_SMTP_PORT": "587",
-        "EXPO_PUBLIC_SMTP_USER": "ask@morrai.com",
-        "EXPO_PUBLIC_SMTP_PASS": "0un:ZX3JOs&E",
-        "EXPO_PUBLIC_SMTP_SECURE": "false",
-        "EXPO_PUBLIC_SMTP_REQUIRE_TLS": "true",
-        "EXPO_PUBLIC_IMAP_HOST": "imap.hostinger.com",
-        "EXPO_PUBLIC_IMAP_PORT": "993",
-        "EXPO_PUBLIC_IMAP_USER": "ask@morrai.com",
-        "EXPO_PUBLIC_IMAP_PASS": "0un:ZX3JOs&E",
-        "EXPO_PUBLIC_IMAP_SECURE": "true",
-        "EXPO_PUBLIC_COMETCHAT_APP_ID": "16836945a87e18e94",
-        "EXPO_PUBLIC_COMETCHAT_REGION": "IN",
-        "EXPO_PUBLIC_COMETCHAT_AUTH_KEY": "3bcd11bec07aad2099c398f67fa82393ded20593",
-        "EXPO_PUBLIC_COMETCHAT_REST_API_KEY": "b9d95bcebc4d19aa12882cf7e82bfca5140ef25a"
       }
     }
   },
