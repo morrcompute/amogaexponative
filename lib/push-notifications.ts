@@ -10,6 +10,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     priority: Notifications.AndroidNotificationPriority.MAX,
   }),
 });
@@ -193,8 +195,8 @@ export async function sendExpoPushNotification(params: {
 
     // 3. Build Expo push messages payload
     const messages = tokenRecords
-      .filter((rec) => Boolean(rec.expo_push_token && typeof rec.expo_push_token === 'string'))
-      .map((rec) => ({
+      .filter((rec: any) => Boolean(rec.expo_push_token && typeof rec.expo_push_token === 'string'))
+      .map((rec: any) => ({
         to: rec.expo_push_token,
         sound: 'default',
         title: `📧 ${senderDisplay}`,
@@ -409,7 +411,7 @@ export async function sendCallPushNotification(params: {
 
     // Deduplicate tokens
     const uniqueTokens = new Map<string, any>();
-    tokenRecords.forEach((rec) => {
+    tokenRecords.forEach((rec: any) => {
       if (rec.expo_push_token && !uniqueTokens.has(rec.expo_push_token)) {
         if (callerId && rec.user_id === callerId) return;
         uniqueTokens.set(rec.expo_push_token, rec);

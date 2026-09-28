@@ -49,9 +49,15 @@ import {
   Flag,
   MoreVertical,
 } from 'lucide-react-native';
-import { useTheme } from 'amogamobileds-v1';
+import { useTheme, downloadOrShareFile, getDocumentViewerUrl } from 'amogamobileds-v1';
 import { useAuth } from '@/providers/auth-provider';
 import { supabase } from '@/lib/supabase';
+
+// Safe WebView import for React Native
+let WebView: any = null;
+try {
+  WebView = require('react-native-webview').WebView;
+} catch (_) {}
 
 export type FileCategoryType =
   | 'Images'
@@ -787,36 +793,15 @@ export function FilesAppView({
   };
 
   const handleDownloadFile = async (file: FileItem) => {
-    if (!file.url) {
-      if (Platform.OS === 'web') alert('No direct download URL available for this file.');
-      return;
-    }
-
-    try {
-      if (Platform.OS === 'web') {
-        const link = document.createElement('a');
-        link.href = file.url;
-        link.download = file.name;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } else {
-        // Native APK / iOS
-        const supported = await Linking.canOpenURL(file.url);
-        if (supported) {
-          await Linking.openURL(file.url);
-        } else {
-          await Linking.openURL(file.url);
-        }
-      }
-    } catch (err) {
-      console.warn('Download error:', err);
-      if (file.url) {
-        Linking.openURL(file.url);
-      }
-    }
+    await downloadOrShareFile({
+      id: file.id,
+      name: file.name,
+      url: file.url,
+      type: file.type,
+      size: file.size,
+      category: file.category,
+      path: file.path,
+    });
   };
 
   const handleOpenFile = (file: FileItem) => {
@@ -1478,6 +1463,59 @@ export function FilesAppView({
                     style={isDesktop ? { width: '100%', height: 260, borderRadius: 10 } : { width: '100%', height: 320, borderRadius: 10 }}
                     resizeMode="contain"
                   />
+                ) : previewModalFile?.url && previewModalFile?.type !== 'OTHER' && previewModalFile?.type !== 'ARCHIVE' ? (
+                  Platform.OS === 'web' ? (
+                    <iframe
+                      src={getDocumentViewerUrl(previewModalFile.url, previewModalFile.name)}
+                      style={{
+                        width: '100%',
+                        height: isDesktop ? 300 : 360,
+                        border: 'none',
+                        borderRadius: 10,
+                      }}
+                      title={previewModalFile.name}
+                    />
+                  ) : WebView ? (
+                    <WebView
+                      source={{ uri: getDocumentViewerUrl(previewModalFile.url, previewModalFile.name) }}
+                      style={{
+                        width: '100%',
+                        height: isDesktop ? 300 : 360,
+                        borderRadius: 10,
+                      }}
+                      startInLoadingState={true}
+                      scalesPageToFit={true}
+                      javaScriptEnabled={true}
+                      domStorageEnabled={true}
+                    />
+                  ) : (
+                    <View style={{ alignItems: 'center', gap: 12, paddingVertical: isDesktop ? 30 : 48 }}>
+                      {previewModalFile && renderThumbnail(previewModalFile, isDesktop ? 54 : 68)}
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          fontWeight: '800',
+                          color: previewModalFile?.color,
+                          letterSpacing: 0.5,
+                          fontFamily: 'Open Sans',
+                        }}
+                      >
+                        {previewModalFile?.badgeLabel} DOCUMENT
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          color: textMuted,
+                          textAlign: 'center',
+                          paddingHorizontal: 16,
+                          fontFamily: 'Open Sans',
+                        }}
+                        numberOfLines={2}
+                      >
+                        {previewModalFile?.name}
+                      </Text>
+                    </View>
+                  )
                 ) : (
                   <View style={{ alignItems: 'center', gap: 12, paddingVertical: isDesktop ? 30 : 48 }}>
                     {previewModalFile && renderThumbnail(previewModalFile, isDesktop ? 54 : 68)}

@@ -299,7 +299,7 @@ export async function sendMessage(params: {
             fileName,
             conversationId,
             isGroup,
-            groupName,
+            groupName: groupName ?? undefined,
           });
         } catch (pushErr) {
           console.warn('[ChatService] Push notification trigger error:', pushErr);

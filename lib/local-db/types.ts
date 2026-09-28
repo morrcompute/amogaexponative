@@ -692,6 +692,8 @@ export interface AppContactRecord {
 export interface AppNotificationRecord {
   app_notification_id?: number;
   app_notification_uuid?: string;
+  created_at?: string | null;
+  attachments?: any;
   status?: string | null;
   description?: string | null;
   icon?: string | null;

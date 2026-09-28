@@ -209,10 +209,10 @@ export class LocalNotificationService {
     );
 
     // 2. Fetch the saved record to get the auto-increment ID
-    const savedRecord = await db.getFirstAsync<AppNotificationRecord>(
+    const savedRecord = (await db.getFirstAsync(
       `SELECT * FROM app_notification WHERE app_notification_uuid = ? LIMIT 1`,
       [notifUuid]
-    );
+    )) as AppNotificationRecord | null;
 
     // 3. Supabase Sync
     try {
@@ -317,7 +317,7 @@ export class LocalNotificationService {
         month_name: record.month_name,
       };
 
-      const { error } = await supabase.from('app_notification').upsert(payload, {
+      const { error } = await (supabase as any).from('app_notification').upsert(payload, {
         onConflict: 'app_notification_uuid',
       });
 
@@ -356,7 +356,7 @@ export class LocalNotificationService {
 
     if (userEmail || userId) {
       try {
-        let query = supabase
+        let query = (supabase as any)
           .from('app_notification')
           .select('*')
           .eq('is_deleted', false)
@@ -383,7 +383,7 @@ export class LocalNotificationService {
         }
 
         if (!error && Array.isArray(cloudItems)) {
-          for (const item of cloudItems) {
+          for (const item of cloudItems as any[]) {
             await db.runAsync(
               `
               INSERT INTO app_notification (
@@ -546,7 +546,7 @@ export class LocalNotificationService {
       `UPDATE app_notification SET is_read = ?, updated_datetime = datetime('now') WHERE app_notification_uuid = ?`,
       [isRead ? 1 : 0, appNotificationUuid]
     );
-    supabase
+    (supabase as any)
       .from('app_notification')
       .update({ is_read: isRead, updated_datetime: new Date().toISOString() })
       .eq('app_notification_uuid', appNotificationUuid)
@@ -562,7 +562,7 @@ export class LocalNotificationService {
       `UPDATE app_notification SET is_starred = ?, updated_datetime = datetime('now') WHERE app_notification_uuid = ?`,
       [isStarred ? 1 : 0, appNotificationUuid]
     );
-    supabase
+    (supabase as any)
       .from('app_notification')
       .update({ is_starred: isStarred, updated_datetime: new Date().toISOString() })
       .eq('app_notification_uuid', appNotificationUuid)
@@ -578,7 +578,7 @@ export class LocalNotificationService {
       `UPDATE app_notification SET is_deleted = 1, updated_datetime = datetime('now') WHERE app_notification_uuid = ?`,
       [appNotificationUuid]
     );
-    supabase
+    (supabase as any)
       .from('app_notification')
       .update({ is_deleted: true, updated_datetime: new Date().toISOString() })
       .eq('app_notification_uuid', appNotificationUuid)

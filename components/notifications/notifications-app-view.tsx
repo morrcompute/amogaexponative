@@ -40,6 +40,11 @@ import { useTheme } from '@/providers/theme-provider';
 import { useAuth } from '@/providers/auth-provider';
 import { supabase } from '@/lib/supabase';
 import { LocalNotificationService, type AppNotificationRecord } from '@/lib/local-db';
+import {
+  DocumentPreviewModal,
+  downloadOrShareFile,
+  type PreviewableFile,
+} from 'amogamobileds-v1';
 
 export type NotificationTabType = 'Inbox' | 'Sent' | 'Folder' | 'Contact';
 
@@ -49,6 +54,9 @@ export interface NotificationAttachment {
   type: string;
   size: string;
   uri?: string;
+  url?: string;
+  content?: string;
+  contentType?: string;
 }
 
 export interface NotificationsAppViewProps {
@@ -95,12 +103,39 @@ export function NotificationsAppView({
   const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
   const [composeAttachments, setComposeAttachments] = useState<NotificationAttachment[]>([]);
+  const [previewAttachment, setPreviewAttachment] = useState<PreviewableFile | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState('Blank');
   const [showCc, setShowCc] = useState(false);
   const [showBcc, setShowBcc] = useState(false);
   const [composeCc, setComposeCc] = useState('');
   const [composeBcc, setComposeBcc] = useState('');
   const [isSending, setIsSending] = useState(false);
+
+  const handlePreviewAttachment = useCallback((att: NotificationAttachment) => {
+    setPreviewAttachment({
+      id: att.id,
+      name: att.name,
+      url: att.url || att.uri,
+      uri: att.uri,
+      type: att.type,
+      size: att.size,
+      content: att.content,
+      contentType: att.contentType,
+    });
+  }, []);
+
+  const handleDownloadAttachment = useCallback(async (att: NotificationAttachment) => {
+    await downloadOrShareFile({
+      id: att.id,
+      name: att.name,
+      url: att.url || att.uri,
+      uri: att.uri,
+      type: att.type,
+      size: att.size,
+      content: att.content,
+      contentType: att.contentType,
+    });
+  }, []);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -109,8 +144,9 @@ export function NotificationsAppView({
   // Sync dynamic From address when auth user or profile is available
   useEffect(() => {
     const senderName =
-      profile?.full_name ||
+      (profile as any)?.full_name ||
       profile?.display_name ||
+      profile?.name ||
       user?.user_metadata?.full_name ||
       user?.email?.split('@')[0] ||
       '';
@@ -228,6 +264,8 @@ export function NotificationsAppView({
             type: ext,
             size: sizeStr,
             uri: asset.uri,
+            url: asset.uri,
+            mimeType: (asset as any).mimeType,
           };
         });
 
@@ -266,6 +304,8 @@ export function NotificationsAppView({
             type: ext,
             size: sizeStr,
             uri: asset.uri,
+            url: asset.uri,
+            mimeType: asset.mimeType,
           };
         });
 
@@ -421,8 +461,9 @@ export function NotificationsAppView({
       const nowIso = new Date().toISOString();
       const currentMonth = new Date().toLocaleString('en-US', { month: 'long' });
       const senderName =
-        profile?.full_name ||
+        (profile as any)?.full_name ||
         profile?.display_name ||
+        profile?.name ||
         user?.user_metadata?.full_name ||
         user?.email?.split('@')[0] ||
         '';
@@ -1146,14 +1187,14 @@ export function NotificationsAppView({
 
                       <View style={styles.attachmentActions}>
                         <TouchableOpacity
-                          onPress={() => alert(`Downloading ${att.name}...`)}
+                          onPress={() => handleDownloadAttachment(att)}
                           style={styles.attActionBtn}
                           accessibilityLabel="Download Attachment"
                         >
                           <Download size={15} color={textMuted} />
                         </TouchableOpacity>
                         <TouchableOpacity
-                          onPress={() => alert(`Previewing ${att.name}...`)}
+                          onPress={() => handlePreviewAttachment(att)}
                           style={styles.attActionBtn}
                           accessibilityLabel="Preview Attachment"
                         >
@@ -1434,14 +1475,14 @@ export function NotificationsAppView({
 
                       <View style={styles.attachmentActions}>
                         <TouchableOpacity
-                          onPress={() => alert(`Downloading ${att.name}...`)}
+                          onPress={() => handleDownloadAttachment(att)}
                           style={styles.attActionBtn}
                           accessibilityLabel="Download Attachment"
                         >
                           <Download size={15} color={textMuted} />
                         </TouchableOpacity>
                         <TouchableOpacity
-                          onPress={() => alert(`Previewing ${att.name}...`)}
+                          onPress={() => handlePreviewAttachment(att)}
                           style={styles.attActionBtn}
                           accessibilityLabel="Preview Attachment"
                         >
@@ -1562,6 +1603,14 @@ export function NotificationsAppView({
           </View>
         )}
       </View>
+
+      {/* Document Preview Modal */}
+      <DocumentPreviewModal
+        visible={!!previewAttachment}
+        file={previewAttachment}
+        onClose={() => setPreviewAttachment(null)}
+        onDownload={(file) => downloadOrShareFile(file)}
+      />
     </View>
   );
 }
